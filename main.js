@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
+import { getPsks } from "./keys.js";
 
 const initWasm = async () => {
   const { instance } = await WebAssembly.instantiateStreaming(
@@ -17,7 +18,7 @@ const initWasm = async () => {
 
   let mnemonic = generateRandomMnemonic(wasm);
   let seed = getSeedFromMnemonic(wasm, mnemonic, "password");
-  
+  let psks = getPsks(wasm, seed);
 };
 
 initWasm();

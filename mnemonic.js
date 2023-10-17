@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { call } from "./wasm.js";
+import { call, jsonFromBytes } from "./wasm.js";
 /**
  *
  * @param {WebAssembly.Exports} wasm
@@ -19,7 +19,7 @@ export const generateRandomMnemonic = (wasm) => {
     rng_seed: Array.from(rng_seed),
   });
 
-  return call(wasm, json, wasm.new_mnemonic).mnemonic_string;
+  return jsonFromBytes(call(wasm, json, wasm.new_mnemonic)).mnemonic_string;
 };
 /**
  * To get the seed, you need the mnemonic and the passphrase
@@ -29,7 +29,7 @@ export const generateRandomMnemonic = (wasm) => {
  * @param {WebAssembly.Exports} wasm
  * @param {string} mnemonic The string mnemonic
  * @param {string} passphrase The password of the wallet
- * @returns {string} Mnemonic string
+ * @returns {string} seed seed bytes
  */
 export const getSeedFromMnemonic = (wasm, mnemonic, passphrase) => {
   let json = JSON.stringify({
@@ -37,5 +37,5 @@ export const getSeedFromMnemonic = (wasm, mnemonic, passphrase) => {
     passphrase: passphrase,
   });
 
-  return call(wasm, json, wasm.get_mnemonic_seed).mnemonic_seed;
+  return jsonFromBytes(call(wasm, json, wasm.get_mnemonic_seed)).mnemonic_seed;
 };

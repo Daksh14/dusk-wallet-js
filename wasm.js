@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 /**
- *
+ * Allocate memory
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} bytes
  * @returns {number} returns the pointer to the allocated buffer
@@ -22,7 +22,7 @@ const alloc = (wasm, bytes) => {
   }
 };
 /**
- *
+ * Deallocate memory
  * @param {WebAssembly.Exports} wasm
  * @param result decomposed result of a wasm call
  * @returns {Uint8Array} memory the function allocated
@@ -71,15 +71,19 @@ export const toBytes = (string) => {
  */
 export const jsonFromBytes = (bytes) => {
   let string = new TextDecoder().decode(bytes);
-  let jsonParsed = JSON.parse(string);
-
-  return jsonParsed;
+  try {
+    let jsonParsed = JSON.parse(string);
+    return jsonParsed;
+  } catch (e) {
+    throw new Error("Error while parsing json output from function");
+  }
 };
 /**
  * Perform a wasm function call
  * @param {WebAssembly.Exports} wasm
  * @param {object} args Arguments of the function in JSON
  * @param {WebAssembly.ExportValue} function_call name of the function you want to call
+ * @returns {Uint8Array} bytes return value of the call
  */
 export const call = (wasm, args, function_call) => {
   let argBytes = toBytes(args);
@@ -93,10 +97,8 @@ export const call = (wasm, args, function_call) => {
     console.error("Function call " + function_call + " failed!");
   }
   let bytes = getAndFree(wasm, callResult);
-  // convert to json
-  let jsonResponse = jsonFromBytes(bytes);
 
-  return jsonResponse;
+  return bytes;
 };
 /**
  * get the tree leaf from leaf the node sent us, deserialized
@@ -107,11 +109,11 @@ export const call = (wasm, args, function_call) => {
  */
 export const getTreeLeafDeserialized = (wasm, leaf) => {
   // we want to send the data in json to wallet-core
-  let json = JSON.stringify({
+  let args = JSON.stringify({
     bytes: Array.from(leaf),
   });
 
-  let treeLeaf = call(wasm, json, wasm.rkyv_tree_leaf);
+  let treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
 
   return treeLeaf;
 };
@@ -122,16 +124,11 @@ export const getTreeLeafDeserialized = (wasm, leaf) => {
  * @returns {Uint8Array} rkyv serialized bytes of the u64
  */
 export const getU64RkyvSerialized = (wasm, num) => {
-  let jsonBytes = toBytes(
-    JSON.stringify({
-      value: num,
-    })
-  );
+  let args = JSON.stringify({
+    value: num,
+  });
 
-  let ptr = alloc(wasm, jsonBytes);
-  let call = wasm.rkyv_u64(ptr, jsonBytes.byteLength);
-  let callResult = decompose(call);
-  let bytes = getAndFree(wasm, callResult);
+  let bytes = call(wasm, args, wasm.rkyv_u64);
 
   return bytes;
 };

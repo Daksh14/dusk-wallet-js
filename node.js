@@ -4,11 +4,12 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 import { load } from "https://deno.land/std@0.204.0/dotenv/mod.ts";
+import { indexedDB } from "https://deno.land/x/indexeddb@v1.1.0/ponyfill.ts";
 import { toBytes, getRkyvSerialized } from "wasm.js";
 /**
  * We store the notes in a indexedDB storage
  */
-const dbHandle = window.indexedDB.open("state", 3);
+const dbHandle = indexedDB.open("state", 1);
 /**
  * Setup error handlers
  */
@@ -38,6 +39,10 @@ const connect = async () => {
  */
 const sync = async () => {
   let leafSize = env["RKYV_TREE_LEAF_SIZE"];
+  // our last height where we start fetching from
+  // We need to set this number for performance reasons,
+  // every invidudal mnemonic wallet has its own last height where it
+  // starts to store its notes from
   let last_pos = 0;
   let request_name = "leaves_from_pos";
   let request_name_bytes = toBytes(request_name);
@@ -65,16 +70,12 @@ const sync = async () => {
 
   // what an indivdual leaf would be
   let leaf;
-  // our last height where we start fetching from
-  // We need to set this number for performance reasons,
-  // every invidudal mnemonic wallet has its own last height where it
-  // starts to store its notes from
   let last = 0;
   let notes = [];
 
   for await (const chunk of resp.body) {
-    leaf = chunk.slice(last, last + RKYV_TREE_LEAF_SIZE);
-    last += RKYV_TREE_LEAF_SIZE;
+    leaf = chunk.slice(last, last + leafSize);
+    last += leafSize;
     // get the tree leaf rkyv serialized
     let tree_leaf = getTreeLeafSerialized(leaf, wasm);
     notes.push(tree_leaf.note);
@@ -82,6 +83,10 @@ const sync = async () => {
 
   dbHandle.onsuccess = (event) => {
     db = event.target.result;
+    const objectStore = db.createObjectStore("state", { keyPath: "psk" });
+    objectStore.createIndex("last_height", "last_height", { unique: true });
+
+    objectStore.transaction.oncomplete = (event) => {};
 
     console.log("State updated");
   };
