@@ -1,15 +1,19 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) DUSK NETWORK. All rights reserved.
 /**
  *
- * @param {WebAssembly.Exports} wasmExports
- * @param {wasmExports.allocate} Wasm export to allocate a buffer
+ * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} bytes
  * @returns {number} returns the pointer to the allocated buffer
  */
-const alloc = (wasmExports, bytes) => {
+const alloc = (wasm, bytes) => {
   let length = bytes.byteLength;
   try {
-    let ptr = wasmExports.allocate(length);
-    let mem = new Uint8Array(wasmExports.memory.buffer, ptr, length);
+    let ptr = wasm.allocate(length);
+    let mem = new Uint8Array(wasm.memory.buffer, ptr, length);
 
     mem.set(new Uint8Array(bytes));
     return ptr;
@@ -19,19 +23,15 @@ const alloc = (wasmExports, bytes) => {
 };
 /**
  *
- * @param {*} wasmExports
+ * @param {WebAssembly.Exports} wasm
  * @param result decomposed result of a wasm call
  * @returns {Uint8Array} memory the function allocated
  */
-const getAndFree = (wasmExports, result) => {
+const getAndFree = (wasm, result) => {
   try {
-    var mem = new Uint8Array(
-      wasmExports.memory.buffer,
-      result.ptr,
-      result.length
-    );
+    var mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
 
-    wasmExports.free_mem(result.ptr, result.length);
+    wasm.free_mem(result.ptr, result.length);
     return mem;
   } catch (e) {
     throw new Error("Error while freeing memory: " + e);
@@ -67,32 +67,71 @@ export const toBytes = (string) => {
 /**
  * Decode the bytes into string and then json parse it
  * @param {Uint8Array} bytes you want to parse to json
+ * @returns {object} Json parsed object
  */
-const jsonFromBytes = (bytes) => {
+export const jsonFromBytes = (bytes) => {
   let string = new TextDecoder().decode(bytes);
-  let json_parsed = JSON.parse(string);
-  return json_parsed;
+  let jsonParsed = JSON.parse(string);
+
+  return jsonParsed;
 };
 /**
- * get the tree leaf from leaf the node sent us
+ * Perform a wasm function call
+ * @param {WebAssembly.Exports} wasm
+ * @param {object} args Arguments of the function in JSON
+ * @param {WebAssembly.ExportValue} function_call name of the function you want to call
+ */
+export const call = (wasm, args, function_call) => {
+  let argBytes = toBytes(args);
+
+  // allocate the json we want to send to wallet-core
+  let ptr = alloc(wasm, argBytes);
+  let call = function_call(ptr, argBytes.byteLength);
+  let callResult = decompose(call);
+
+  if (!callResult.status) {
+    console.error("Function call " + function_call + " failed!");
+  }
+  let bytes = getAndFree(wasm, callResult);
+  // convert to json
+  let jsonResponse = jsonFromBytes(bytes);
+
+  return jsonResponse;
+};
+/**
+ * get the tree leaf from leaf the node sent us, deserialized
+ * into notes and block height
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} leaf bytes you get from the node
  * @returns {object} json serialized bytes of leaf (note and height)
  */
-const getTreeLeafSerialized = (wasmExports, leaf) => {
+export const getTreeLeafDeserialized = (wasm, leaf) => {
   // we want to send the data in json to wallet-core
   let json = JSON.stringify({
     bytes: Array.from(leaf),
   });
-  let json_bytes = toBytes(json);
-  // allocate the json we want to send to wallet-core
-  let ptr = alloc(wasm, json_bytes);
-  // get it serialized
-  let call = wasmExports.rkyv_tree_leaf(ptr, json_bytes.byteLength);
-  let callResult = decompose(call);
-  let bytes = getAndFree(wasm, callResult);
-  // convert to json
-  let treeLeaf = jsonFromBytes(bytes);
+
+  let treeLeaf = call(wasm, json, wasm.rkyv_tree_leaf);
 
   return treeLeaf;
+};
+/**
+ * Convert a number to rkyv serialized bytes
+ * @param {WebAssembly.Exports} wasm
+ * @param {number} number we want to rkyv serialize
+ * @returns {Uint8Array} rkyv serialized bytes of the u64
+ */
+export const getU64RkyvSerialized = (wasm, num) => {
+  let jsonBytes = toBytes(
+    JSON.stringify({
+      value: num,
+    })
+  );
+
+  let ptr = alloc(wasm, jsonBytes);
+  let call = wasm.rkyv_u64(ptr, jsonBytes.byteLength);
+  let callResult = decompose(call);
+  let bytes = getAndFree(wasm, callResult);
+
+  return bytes;
 };
