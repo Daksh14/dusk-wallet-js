@@ -13,7 +13,7 @@ This will create a `dist/wallet.js` which can be used on the frontend side
 
 ## Usage 
 
-```
+```html
 <script type="module">
   import { Wallet } from "../dist/wallet.js";
   const initWasm = async () => {
