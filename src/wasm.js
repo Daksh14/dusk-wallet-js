@@ -3,13 +3,14 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
+
 /**
  * Allocate memory
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} bytes
  * @returns {number} returns the pointer to the allocated buffer
  */
-const alloc = (wasm, bytes) => {
+function alloc(wasm, bytes) {
   let length = bytes.byteLength;
   try {
     let ptr = wasm.allocate(length);
@@ -20,14 +21,14 @@ const alloc = (wasm, bytes) => {
   } catch (error) {
     throw new Error("Error allocating memory in wasm: ", +error);
   }
-};
+}
 /**
  * Deallocate memory
  * @param {WebAssembly.Exports} wasm
  * @param result decomposed result of a wasm call
  * @returns {Uint8Array} memory the function allocated
  */
-const getAndFree = (wasm, result) => {
+function getAndFree(wasm, result) {
   try {
     var mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
 
@@ -36,13 +37,13 @@ const getAndFree = (wasm, result) => {
   } catch (e) {
     throw new Error("Error while freeing memory: " + e);
   }
-};
+}
 /**
  * Decompose a i64 output from a call into the packed pointer, length and sucess bit
  * @param result result of a wasm call
  * @returns {object} an object containing ptr, length and status bit
  */
-const decompose = (result) => {
+function decompose(result) {
   let ptr = result >> 32n;
   let len = ((result << 32n) & ((1n << 64n) - 1n)) >> 48n;
   let success = ((result << 63n) & ((1n << 64n) - 1n)) >> 63n == 0n;
@@ -52,7 +53,7 @@ const decompose = (result) => {
     length: Number(len.toString()),
     status: success,
   };
-};
+}
 /**
  * encode the string into bytes
  * @param {string} String to convert to bytes
@@ -69,7 +70,7 @@ export const toBytes = (string) => {
  * @param {Uint8Array} bytes you want to parse to json
  * @returns {object} Json parsed object
  */
-export const jsonFromBytes = (bytes) => {
+export function jsonFromBytes(bytes) {
   let string = new TextDecoder().decode(bytes);
   try {
     let jsonParsed = JSON.parse(string);
@@ -77,7 +78,7 @@ export const jsonFromBytes = (bytes) => {
   } catch (e) {
     throw new Error("Error while parsing json output from function");
   }
-};
+}
 /**
  * Perform a wasm function call
  * @param {WebAssembly.Exports} wasm
@@ -85,7 +86,7 @@ export const jsonFromBytes = (bytes) => {
  * @param {WebAssembly.ExportValue} function_call name of the function you want to call
  * @returns {Uint8Array} bytes return value of the call
  */
-export const call = (wasm, args, function_call) => {
+export function call(wasm, args, function_call) {
   let argBytes = toBytes(args);
 
   // allocate the json we want to send to wallet-core
@@ -99,36 +100,4 @@ export const call = (wasm, args, function_call) => {
   let bytes = getAndFree(wasm, callResult);
 
   return bytes;
-};
-/**
- * get the tree leaf from leaf the node sent us, deserialized
- * into notes and block height
- * @param {WebAssembly.Exports} wasm
- * @param {Uint8Array} leaf bytes you get from the node
- * @returns {object} json serialized bytes of leaf (note and height)
- */
-export const getTreeLeafDeserialized = (wasm, leaf) => {
-  // we want to send the data in json to wallet-core
-  let args = JSON.stringify({
-    bytes: Array.from(leaf),
-  });
-
-  let treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
-
-  return treeLeaf;
-};
-/**
- * Convert a number to rkyv serialized bytes
- * @param {WebAssembly.Exports} wasm
- * @param {number} number we want to rkyv serialize
- * @returns {Uint8Array} rkyv serialized bytes of the u64
- */
-export const getU64RkyvSerialized = (wasm, num) => {
-  let args = JSON.stringify({
-    value: num,
-  });
-
-  let bytes = call(wasm, args, wasm.rkyv_u64);
-
-  return bytes;
-};
+}

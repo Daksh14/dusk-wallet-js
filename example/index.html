@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head> </head>
+
+  <body>
+    <div><p>Well this is awkward</p></div>
+    <script type="module">
+      import { Wallet } from "../dist/wallet.js";
+      const initWasm = async () => {
+        const { instance } = await WebAssembly.instantiateStreaming(
+          fetch("../assets/dusk-wallet-core-0.21.0.wasm")
+        );
+
+        let wasm = instance.exports;
+
+        // let mnemonic = generateRandomMnemonic(wasm);
+        let seed = [
+          153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10,
+          115, 19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90,
+          145, 168, 214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34,
+          113, 55, 172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196,
+          252, 117, 221, 221,
+        ];
+        let wallet = new Wallet(wasm, seed);
+        let psks = wallet.getPsks();
+        let sync = await wallet.sync();
+        let balance = wallet.getBalance(psks[0], (bal) => {
+          console.log(bal.value);
+        });
+      };
+
+      document.addEventListener("DOMContentLoaded", function (event) {
+        initWasm().catch((e) => console.error(e));
+      });
+    </script>
+  </body>
+</html>
