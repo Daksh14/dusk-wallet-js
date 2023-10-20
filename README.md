@@ -50,13 +50,12 @@ This will create a `dist/wallet.js` which can be used on the frontend side
 ```
 
 ## Syncronization
-To sync with the latest notes, call the `node.js/sync()` function, its arguments are only the 
-wasm module and the wallet seed. It saves the state in indexedDB and **increments the version number
-everytime** it inserts a new state.
+To sync with the latest notes, call the `Wallet.sync()`. It saves the state in indexedDB and localstorage
+it will log the console.error if localstorage or indexedDB is `undefined`
 
 ## Operations
 After the sync is done and latest state is in the db, you can call 
-`balance.js/getBalance()` and calculate the balance with `spendable` and `value` as fields
+`Wallet.getBalance()` and calculate the balance with `spendable` and `value` as fields
 
 ## Tx history
 run the wallet.getSpentNotes()
