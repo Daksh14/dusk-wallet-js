@@ -64,9 +64,9 @@ export function getNullifiersRkyvSerialized(wasm, bytes) {
     bytes: Array.from(bytes),
   });
 
-  let result = jsonFromBytes(call(wasm, args, wasm.rkyv_bls_scalar_array));
+  let result = call(wasm, args, wasm.rkyv_bls_scalar_array);
 
-  return result.bls_scalars;
+  return result;
 }
 /**
  * Convert Uint8Array into Vec<Vec<u8>> which is Vec<BlsScalar> rkyv serialized into a Vec<Vec<u8>>
@@ -82,4 +82,20 @@ export function getNullifiersDeserialized(wasm, bytes) {
   let result = jsonFromBytes(call(wasm, args, wasm.bls_scalar_array_rkyv));
 
   return result.bytes;
+}
+
+/**
+ * Convert Array<OpeningsBytes> -> Vec<Openings> -> rkyv serialized Vec<u8>
+ * @param {WebAssembly.Exports} wasm
+ * @param {Array<Uint8Array>} bytes - Array<Bytes> the bytes are rkyv serialized openings
+ * @returns {Uint8Array} rkyv serialized Vec<Openings>
+ */
+export function getOpeningsSerialized(wasm, bytes) {
+  let args = JSON.stringify({
+    openings: bytes,
+  });
+
+  let result = call(wasm, args, wasm.rkyv_openings_array);
+
+  return result;
 }

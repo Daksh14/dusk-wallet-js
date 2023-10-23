@@ -38,3 +38,29 @@ export function checkIfOwned(wasm, seed, note) {
 
   return jsonFromBytes(call(wasm, json, wasm.check_note_ownership));
 }
+
+/**
+ *
+ * @param {WebAssembly.Exports} wasm
+ * @param {Array<Uint8Array>} notes Array of rkyv serialized notes
+ * @param {Array<Uint8Array>} nullifiersOfNote Array of rkyv serialized BlsScalar
+ * @param {Uint8Array} existingNullifiers Vec<BlsScalar> from the node
+ * @param {Array<string>} psks Public spend keys of the notes
+ * @returns
+ */
+export function unspentSpentNotes(
+  wasm,
+  notes,
+  nullifiersOfNote,
+  existingNullifiers,
+  psks
+) {
+  let args = JSON.stringify({
+    notes: notes,
+    nullifiers_of_notes: nullifiersOfNote,
+    existing_nullifiers: Array.from(existingNullifiers),
+    psks: psks,
+  });
+
+  return jsonFromBytes(call(wasm, args, wasm.unspent_spent_notes));
+}

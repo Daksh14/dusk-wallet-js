@@ -10,25 +10,23 @@ import { Dexie } from "../deps.js";
  * This is called by the sync function
  * @param {Array<Uint8Array>} unspent_notes Notes which are not spent
  * @param {Array<Uint8Array>} spent_notes
- * @param {number} maxHeight The maximum height we are at right now
+ * @param {number} pos The position we are at right now
  */
-export function stateDB(unspentNotes, spentNotes, maxHeight) {
+export function stateDB(unspentNotes, spentNotes, pos) {
   const db = new Dexie("state");
 
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,last_height,psk",
-    spentNotes: "++id,last_height,psk",
+    unspentNotes: "++id,pos,psk,note",
+    spentNotes: "++id,pos,psk,note",
   });
 
   try {
-    localStorage.setItem("lastPos", maxHeight.toString());
-    console.log("Set max height in local storage: " + maxHeight);
+    localStorage.setItem("lastPos", pos.toString());
+    console.log("Set last pos in local storage: " + pos);
   } catch (e) {
-    console.error(
-      "Cannot set maxHeight in local storage, the wallet might be slow"
-    );
+    console.error("Cannot set pos in local storage, the wallet might be slow");
   }
 
   db.unspentNotes
@@ -61,7 +59,7 @@ export function stateDB(unspentNotes, spentNotes, maxHeight) {
 /**
  * Fetch unspent notes from the IndexedDB if there are any
  * @param {string} psk - bs58 encoded public spend key to fetch the unspent notes of
- * @param {Function} callback - function(unspent_notes) {}
+ * @param {Function} callback - function(unspent_notes_array) {}
  * @returns {object} notes - unspent notes of the psk
  */
 export async function getUnpsentNotes(psk, callback) {
@@ -73,7 +71,7 @@ export async function getUnpsentNotes(psk, callback) {
       if (myTable) {
         const notes = myTable.filter((note) => note.psk == psk);
         const result = await notes.toArray();
-        callback(result);
+        await callback(result);
       }
     })
     .catch((error) => {
@@ -117,7 +115,7 @@ export async function getLastPos() {
       return 0;
     } else {
       try {
-        return parseInt(lastPos);
+        return parseInt(lastPos) + 1;
       } catch (e) {
         console.error("Invalid lastPos set");
         localStorage.removeItem("lastPos");

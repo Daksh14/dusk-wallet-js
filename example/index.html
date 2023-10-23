@@ -24,9 +24,15 @@
         let wallet = new Wallet(wasm, seed);
         let psks = wallet.getPsks();
         let sync = await wallet.sync();
-        let balance = wallet.getBalance(psks[0], (bal) => {
+        wallet.getBalance(psks[0], (bal) => {
           console.log(bal.value);
         });
+
+        wallet.getBalance(psks[1], (bal) => {
+          console.log(bal.value);
+        });
+
+        // let transfer = wallet.transfer(psks[0], psks[1], 5_000_000_000);
       };
 
       document.addEventListener("DOMContentLoaded", function (event) {

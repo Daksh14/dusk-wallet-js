@@ -8,6 +8,7 @@ import { sync } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import { getPsks } from "./keys.js";
 import { getBalance } from "./balance.js";
+import { transfer } from "./transfer.js";
 import { getUnpsentNotes } from "./indexedDB.js";
 
 /**
@@ -43,4 +44,14 @@ Wallet.prototype.getPsks = function (k) {
  */
 Wallet.prototype.sync = async function () {
   return await sync(this.wasm, this.seed);
+};
+/**
+ * Transfer Dusk from sender psk to reciever psk
+ * @param {string} sender bs58 encoded Psk to send the dusk from
+ * @param {string} reciever bs68 encoded psk of the address who will receiver the dusk
+ * @param {number} amount Amount of dusk to send
+ *
+ */
+Wallet.prototype.transfer = async function (sender, reciever, amount) {
+  return await transfer(this.wasm, this.seed, sender, reciever, amount);
 };

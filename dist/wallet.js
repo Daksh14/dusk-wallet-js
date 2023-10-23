@@ -4909,7 +4909,7 @@ var require_dexie = __commonJS({
         var currentValue = void 0;
         var observable = new Observable(function(observer) {
           var scopeFuncIsAsync = isAsyncFunction(querier);
-          function execute(subscr) {
+          function execute2(subscr) {
             if (scopeFuncIsAsync) {
               incrementExpectedAwaits();
             }
@@ -4952,7 +4952,7 @@ var require_dexie = __commonJS({
               return;
             accumMuts = {};
             var subscr = {};
-            var ret = execute(subscr);
+            var ret = execute2(subscr);
             if (!startedListening) {
               globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
               startedListening = true;
@@ -5290,36 +5290,34 @@ function getNullifiersRkyvSerialized(wasm, bytes) {
   let args = JSON.stringify({
     bytes: Array.from(bytes)
   });
-  let result = jsonFromBytes(call(wasm, args, wasm.rkyv_bls_scalar_array));
-  return result.bls_scalars;
+  let result = call(wasm, args, wasm.rkyv_bls_scalar_array);
+  return result;
 }
-function getNullifiersDeserialized(wasm, bytes) {
+function getOpeningsSerialized(wasm, bytes) {
   let args = JSON.stringify({
-    bytes: Array.from(bytes)
+    openings: bytes
   });
-  let result = jsonFromBytes(call(wasm, args, wasm.bls_scalar_array_rkyv));
-  return result.bytes;
+  let result = call(wasm, args, wasm.rkyv_openings_array);
+  return result;
 }
 
 // deps.js
 var import_dexie = __toESM(require_dexie());
 
 // src/indexedDB.js
-function stateDB(unspentNotes, spentNotes, maxHeight) {
+function stateDB(unspentNotes, spentNotes, pos) {
   const db = new import_dexie.Dexie("state");
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,last_height,psk",
-    spentNotes: "++id,last_height,psk"
+    unspentNotes: "++id,pos,psk,note",
+    spentNotes: "++id,pos,psk,note"
   });
   try {
-    localStorage.setItem("lastPos", maxHeight.toString());
-    console.log("Set max height in local storage: " + maxHeight);
+    localStorage.setItem("lastPos", pos.toString());
+    console.log("Set last pos in local storage: " + pos);
   } catch (e) {
-    console.error(
-      "Cannot set maxHeight in local storage, the wallet might be slow"
-    );
+    console.error("Cannot set pos in local storage, the wallet might be slow");
   }
   db.unspentNotes.bulkPut(unspentNotes).then(() => {
     console.log("Persisted unspent notes");
@@ -5343,7 +5341,7 @@ async function getUnpsentNotes(psk, callback) {
     if (myTable) {
       const notes = myTable.filter((note) => note.psk == psk);
       const result = await notes.toArray();
-      callback(result);
+      await callback(result);
     }
   }).catch((error) => {
     console.error("Error while getting unspent notes: " + error);
@@ -5357,7 +5355,7 @@ async function getLastPos() {
       return 0;
     } else {
       try {
-        return parseInt(lastPos);
+        return parseInt(lastPos) + 1;
       } catch (e) {
         console.error("Invalid lastPos set");
         localStorage.removeItem("lastPos");
@@ -5378,6 +5376,15 @@ function checkIfOwned(wasm, seed, note) {
   });
   return jsonFromBytes(call(wasm, json, wasm.check_note_ownership));
 }
+function unspentSpentNotes(wasm, notes, nullifiersOfNote, existingNullifiers, psks) {
+  let args = JSON.stringify({
+    notes,
+    nullifiers_of_notes: nullifiersOfNote,
+    existing_nullifiers: Array.from(existingNullifiers),
+    psks
+  });
+  return jsonFromBytes(call(wasm, args, wasm.unspent_spent_notes));
+}
 
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
@@ -5397,6 +5404,7 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   let block_heights = [];
   let nullifiers = [];
   let psks = [];
+  let positions = [];
   let lastPos = 0;
   for await (const chunk of resp.body) {
     for (let i = 0; i < chunk.length; i += leafSize) {
@@ -5404,11 +5412,13 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
       let treeLeaf = getTreeLeafDeserialized(wasm, leaf2);
       let note = treeLeaf.note;
       let blockHeight = treeLeaf.block_height;
+      let pos = treeLeaf.last_pos;
       let owned = checkIfOwned(wasm, seed, note);
       if (owned.is_owned) {
+        lastPos = Math.max(lastPos, pos);
         notes.push(note);
         block_heights.push(blockHeight);
-        lastPos = Math.max(lastPos, treeLeaf.last_pos);
+        positions.push(pos);
         nullifiers.push(owned.nullifier);
         psks.push(owned.public_spend_key);
       }
@@ -5421,34 +5431,23 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
     false
   );
   let existingNullifiers = await existingNullifiersRemote.arrayBuffer();
-  let existingNullifiersDeserialized = getNullifiersDeserialized(
+  let existingNullifiersBytes = new Uint8Array(existingNullifiers);
+  let allNotes = unspentSpentNotes(
     wasm,
-    new Uint8Array(existingNullifiers)
+    notes,
+    nullifiers,
+    existingNullifiersBytes,
+    psks
   );
-  let unspent_notes = [];
-  let spent_notes = [];
-  notes.forEach((note, index) => {
-    existingNullifiersDeserialized.forEach((nullifiersBytes) => {
-      if (nullifiersBytes.every((val, i) => val == nullifiers[index][i])) {
-        spent_notes.push({
-          note,
-          block_height: block_heights[index],
-          psk: psks[index]
-        });
-      } else {
-        unspent_notes.push({
-          note,
-          block_height: block_heights[index],
-          psk: psks[index]
-        });
-      }
-    });
-  });
-  if (unspent_notes.length > 0 || spent_notes.length > 0 || lastPos !== lastPosDB) {
-    stateDB(unspent_notes, spent_notes, lastPos);
+  let unspentNotes = allNotes.unspent_notes;
+  let spentNotes = allNotes.spent_notes;
+  if (unspentNotes.length > 0 || spentNotes.length > 0 || // if the last pos we get from the node is bigger than the
+  // last pos we have on the db then we need to update it
+  lastPos >= lastPosDB) {
+    stateDB(unspentNotes, spentNotes, lastPos);
   }
 }
-async function request(data, request_name, stream, node = LOCAL_NODE) {
+async function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFER_CONTRACT, targetType = "1") {
   let request_name_bytes = toBytes(request_name);
   let number = numberToLittleEndianByteArray(request_name.length);
   let length = number.length + request_name_bytes.length + data.length;
@@ -5464,7 +5463,7 @@ async function request(data, request_name, stream, node = LOCAL_NODE) {
     headers["Rusk-Feeder"] = "1";
   }
   try {
-    let resp = await fetch(node + "1/" + TRANSFER_CONTRACT, {
+    let resp = await fetch(node + targetType + "/" + target, {
       method: "POST",
       headers,
       body: request2
@@ -5472,6 +5471,16 @@ async function request(data, request_name, stream, node = LOCAL_NODE) {
     return resp;
   } catch (e) {
     throw new Error("Error while sending request to node: " + e);
+  }
+}
+async function fetchOpenings(pos, node = LOCAL_NODE) {
+  try {
+    let response = await request(pos, "opening", false);
+    let buffer = await response.arrayBuffer();
+    let bytes = new Uint8Array(buffer);
+    return bytes;
+  } catch (e) {
+    console.log("Fetching Openings failed: " + e);
   }
 }
 function numberToLittleEndianByteArray(num) {
@@ -5503,6 +5512,104 @@ async function getBalance(wasm, seed, psk, callback) {
   });
 }
 
+// src/tx.js
+function getUnprovenTxVarBytes(wasm, unprovenTx) {
+  let args = JSON.stringify({
+    bytes: unprovenTx
+  });
+  let result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
+  return result.serialized;
+}
+function proveTx(wasm, unprovenTx, proof) {
+  let args = JSON.stringify({
+    unproven_tx: unprovenTx,
+    proof: Array.from(proof)
+  });
+  console.log(args);
+  let result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
+  return result.bytes;
+}
+
+// src/execute.js
+function execute(wasm, seed, psk, output, callData, crossover, gas_limit, gas_price) {
+  let rng_seed = new Uint8Array(64);
+  crypto.getRandomValues(rng_seed);
+  getUnpsentNotes(psk, async (notes) => {
+    let openings = [];
+    let allNotes = [];
+    await Promise.all(
+      notes.map(async (noteData) => {
+        let pos = noteData.pos;
+        let fetchedOpening = await fetchOpenings(
+          getU64RkyvSerialized(wasm, pos)
+        );
+        openings.push(Array.from(fetchedOpening));
+        allNotes.push(noteData.note);
+      })
+    );
+    let openingsSerialized = getOpeningsSerialized(wasm, openings);
+    let inputs = getNotesRkyvSerialized(wasm, allNotes);
+    let args = JSON.stringify({
+      call: callData,
+      crossover,
+      seed,
+      rng_seed: Array.from(rng_seed),
+      inputs: Array.from(inputs),
+      refund: psk,
+      output,
+      openings: Array.from(openingsSerialized),
+      gas_limit,
+      gas_price
+    });
+    let unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
+    console.log("unrpovenTx: " + unprovenTx);
+    let varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
+    let proofReq = await request(
+      varBytes,
+      "prove_execute",
+      false,
+      void 0,
+      "rusk",
+      "2"
+    );
+    console.log("Prove_execute statsu code: " + proofReq.status);
+    let buffer = await proofReq.arrayBuffer();
+    let bytes = new Uint8Array(buffer);
+    let tx = proveTx(wasm, unprovenTx, bytes);
+    let preVerifyReq = await request(
+      tx,
+      "preverify",
+      false,
+      void 0,
+      "rusk",
+      "2"
+    );
+    console.log("Preverify request status code: " + preVerifyReq.status);
+    let bufferPreVerifyReq = await preVerifyReq.arrayBuffer();
+    let bytesPreVerifyReq = new Uint8Array(bufferPreVerifyReq);
+    let propogateReq = await request(
+      tx,
+      "propagate_tx",
+      false,
+      void 0,
+      "Chain",
+      "2"
+    );
+    console.log("Propogating chain request status: " + propogateReq.status());
+  });
+}
+
+// src/transfer.js
+async function transfer(wasm, seed, sender, receiver, amount) {
+  let output = {
+    receiver,
+    note_type: "Obfuscated",
+    ref_id: 1,
+    value: amount
+  };
+  execute(wasm, seed, sender, output, void 0, void 0, 5e8, 1);
+}
+
 // src/mod.js
 function Wallet(wasmExports, seed) {
   this.wasm = wasmExports;
@@ -5516,6 +5623,9 @@ Wallet.prototype.getPsks = function(k) {
 };
 Wallet.prototype.sync = async function() {
   return await sync(this.wasm, this.seed);
+};
+Wallet.prototype.transfer = async function(sender, reciever, amount) {
+  return await transfer(this.wasm, this.seed, sender, reciever, amount);
 };
 export {
   Wallet

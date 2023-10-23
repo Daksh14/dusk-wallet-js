@@ -13,7 +13,7 @@ import {
   getNullifiersDeserialized,
 } from "./rkyv.js";
 import { stateDB, getLastPos } from "./indexedDB.js";
-import { getNullifiers, checkIfOwned } from "./crypto.js";
+import { getNullifiers, checkIfOwned, unspentSpentNotes } from "./crypto.js";
 
 // env variables
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
@@ -53,6 +53,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   let block_heights = [];
   let nullifiers = [];
   let psks = [];
+  let positions = [];
   let lastPos = 0;
 
   for await (const chunk of resp.body) {
@@ -63,13 +64,16 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
 
       let note = treeLeaf.note;
       let blockHeight = treeLeaf.block_height;
+      let pos = treeLeaf.last_pos;
 
       let owned = checkIfOwned(wasm, seed, note);
 
       if (owned.is_owned) {
+        lastPos = Math.max(lastPos, pos);
+
         notes.push(note);
         block_heights.push(blockHeight);
-        lastPos = Math.max(lastPos, treeLeaf.last_pos);
+        positions.push(pos);
         nullifiers.push(owned.nullifier);
         psks.push(owned.public_spend_key);
       }
@@ -87,52 +91,48 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
 
   let existingNullifiers = await existingNullifiersRemote.arrayBuffer();
 
-  let existingNullifiersDeserialized = getNullifiersDeserialized(
+  let existingNullifiersBytes = new Uint8Array(existingNullifiers);
+
+  let allNotes = unspentSpentNotes(
     wasm,
-    new Uint8Array(existingNullifiers)
+    notes,
+    nullifiers,
+    existingNullifiersBytes,
+    psks
   );
 
-  // FIXME: Move this logic to the backend maybe
-  // possible to simplify this when we send the nullifier of the note
-  // in the TreeLeaf with the Note and block_height
-  let unspent_notes = [];
-  let spent_notes = [];
-
-  notes.forEach((note, index) => {
-    existingNullifiersDeserialized.forEach((nullifiersBytes) => {
-      if (nullifiersBytes.every((val, i) => val == nullifiers[index][i])) {
-        spent_notes.push({
-          note: note,
-          block_height: block_heights[index],
-          psk: psks[index],
-        });
-      } else {
-        unspent_notes.push({
-          note: note,
-          block_height: block_heights[index],
-          psk: psks[index],
-        });
-      }
-    });
-  });
+  let unspentNotes = allNotes.unspent_notes;
+  let spentNotes = allNotes.spent_notes;
 
   // if we have anything to insert then we insert
   if (
-    unspent_notes.length > 0 ||
-    spent_notes.length > 0 ||
-    lastPos !== lastPosDB
+    unspentNotes.length > 0 ||
+    spentNotes.length > 0 ||
+    // if the last pos we get from the node is bigger than the
+    // last pos we have on the db then we need to update it
+    lastPos >= lastPosDB
   ) {
-    stateDB(unspent_notes, spent_notes, lastPos);
+    stateDB(unspentNotes, spentNotes, lastPos);
   }
 }
 /**
- *
+ * By default query the transfer contract unless given otherwise
  * @param {Array<Uint8Array>} data Data that is sent with the request
  * @param {string} request_name Name of the request we are performing
  * @param {boolean} stream If you want the response streamed or not
+ * @param {string} node Node address, by default LOCAL_NODe
+ * @param {string} target target address, by default transfer contract
+ * @param {string} targetType the target number in string
  * @returns {Response} response Result of the fetch
  */
-async function request(data, request_name, stream, node = LOCAL_NODE) {
+export async function request(
+  data,
+  request_name,
+  stream,
+  node = LOCAL_NODE,
+  target = TRANSFER_CONTRACT,
+  targetType = "1"
+) {
   let request_name_bytes = toBytes(request_name);
   let number = numberToLittleEndianByteArray(request_name.length);
   let length = number.length + request_name_bytes.length + data.length;
@@ -155,7 +155,7 @@ async function request(data, request_name, stream, node = LOCAL_NODE) {
 
   try {
     /// http://127.0.0.1:8080/ + 1/ + 00002 = http://127.0.0.1:8080/1/00002
-    let resp = await fetch(node + "1/" + TRANSFER_CONTRACT, {
+    let resp = await fetch(node + targetType + "/" + target, {
       method: "POST",
       headers: headers,
       body: request,
@@ -163,6 +163,25 @@ async function request(data, request_name, stream, node = LOCAL_NODE) {
     return resp;
   } catch (e) {
     throw new Error("Error while sending request to node: " + e);
+  }
+}
+
+/**
+ *
+ * @param {number} pos - Position of the note we want the opening of
+ * @param {string} node - Node address
+ * @returns {Uint8Array} - Bytes of the UInt8Array
+ */
+export async function fetchOpenings(pos, node = LOCAL_NODE) {
+  try {
+    let response = await request(pos, "opening", false);
+
+    let buffer = await response.arrayBuffer();
+
+    let bytes = new Uint8Array(buffer);
+    return bytes;
+  } catch (e) {
+    console.log("Fetching Openings failed: " + e);
   }
 }
 /**

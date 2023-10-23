@@ -7,7 +7,7 @@ This will be later grafted into js-utils repo
 
 ## Bundling
 ```
-➜ deno run --allow-read --allow-net --allow-write --allow-env --allow-run build.js
+➜ deno task build
 ```
 This will create a `dist/wallet.js` which can be used on the frontend side
 
@@ -65,5 +65,5 @@ Add integration test against a local node. Figure out how to run that in CI
 
 To run the example first build and then
 ```
-➜ deno run --allow-read --allow-net testServer.js
+➜ deno task server
 ```

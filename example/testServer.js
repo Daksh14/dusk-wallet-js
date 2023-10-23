@@ -3,6 +3,13 @@ import { oakCors } from "https://deno.land/x/cors/mod.ts";
 
 const app = new Application();
 
+// The domain for LOCAL_NODE for example purposes
+app.use(
+  oakCors({
+    origin: "http://127:8080",
+  })
+);
+
 app.use(async (context, next) => {
   try {
     await context.send({
@@ -14,9 +21,8 @@ app.use(async (context, next) => {
   }
 });
 
-// The domain for LOCAL_NODE for example purposes
-app.use(oakCors({ origin: "http://localhost:8080" }));
-
-console.log("Starting example server at http://localhost:8000/index.html");
+console.log(
+  "Starting example server at http://localhost:8000/example/index.html"
+);
 
 await app.listen({ port: 8000 });

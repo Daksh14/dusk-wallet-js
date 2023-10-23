@@ -97,6 +97,7 @@ export function call(wasm, args, function_call) {
   if (!callResult.status) {
     console.error("Function call " + function_call + " failed!");
   }
+
   let bytes = getAndFree(wasm, callResult);
 
   return bytes;

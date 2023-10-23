@@ -1,0 +1,40 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) DUSK NETWORK. All rights reserved.
+
+import { call, jsonFromBytes } from "./wasm.js";
+
+/**
+ * Convert a UnprovenTx recieved from execute into bytes we can send to the network
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} unprovenTx - UnprovenTx bytes recieived from calling execute in wasm
+ * @returns {Uint8Array} var bytes of unproven tx ready to be sent to the network
+ */
+export function getUnprovenTxVarBytes(wasm, unprovenTx) {
+  let args = JSON.stringify({
+    bytes: unprovenTx,
+  });
+
+  let result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
+
+  return result.serialized;
+}
+/**
+ * Prove a unrpoven transaction and return the bytes of the tx
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} unprovenTx Bytes of the unprovenTx recieved from the execute call
+ * @param {Uint8Array} proof proof recieved from the network
+ * @returns {Uint8Array} the proven transaction bytes ready to be sent to the network
+ */
+export function proveTx(wasm, unprovenTx, proof) {
+  let args = JSON.stringify({
+    unproven_tx: unprovenTx,
+    proof: Array.from(proof),
+  });
+
+  let result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
+
+  return result.bytes;
+}
