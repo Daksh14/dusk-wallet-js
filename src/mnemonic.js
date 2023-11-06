@@ -12,10 +12,10 @@ import { call, jsonFromBytes } from "./wasm.js";
  */
 export function generateRandomMnemonic(wasm) {
   // fill with random values
-  let rng_seed = new Uint8Array(32);
+  const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
 
-  let json = JSON.stringify({
+  const json = JSON.stringify({
     rng_seed: Array.from(rng_seed),
   });
 
@@ -28,11 +28,11 @@ export function generateRandomMnemonic(wasm) {
  *
  * @param {WebAssembly.Exports} wasm
  * @param {string} mnemonic The string mnemonic
- * @param {string} passphrase The password of the wallet
+ * @param {string} passphrase The password of the walconst
  * @returns {string} seed seed bytes
  */
 export function getSeedFromMnemonic(wasm, mnemonic, passphrase) {
-  let json = JSON.stringify({
+  const json = JSON.stringify({
     mnemonic: mnemonic,
     passphrase: passphrase,
   });

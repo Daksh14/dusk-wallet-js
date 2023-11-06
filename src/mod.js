@@ -8,8 +8,11 @@ import { sync } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import { getPsks } from "./keys.js";
 import { getBalance } from "./balance.js";
-import { transfer } from "./transfer.js";
-import { getUnpsentNotes } from "./indexedDB.js";
+import { transfer } from "./contracts/transfer.js";
+import { stake, stakeInfo } from "./contracts/stake.js";
+
+// Export mnemnoic functions
+export { generateRandomMnemonic, getSeedFromMnemonic };
 
 /**
  * Construct a wallet from this function
@@ -22,11 +25,12 @@ export function Wallet(wasmExports, seed) {
   this.wasm = wasmExports;
   this.seed = seed;
 }
+
 /**
  * Get balance
  * @param {string} psk - bs58 encoded public spend key of the user we want to
- * @param {Function} callback - function(balance) {}
- * find the balance of
+ * @param {Function} callback - function(balance) {balance.maximum and balance.value}
+ *
  */
 Wallet.prototype.getBalance = function (psk, callback) {
   getBalance(this.wasm, this.seed, psk, callback);
@@ -35,7 +39,7 @@ Wallet.prototype.getBalance = function (psk, callback) {
  * Get psks for the seed
  * @returns {Array<string>} psks Psks of the first 21 address for the seed
  */
-Wallet.prototype.getPsks = function (k) {
+Wallet.prototype.getPsks = function () {
   return getPsks(this.wasm, this.seed);
 };
 /**
@@ -49,9 +53,37 @@ Wallet.prototype.sync = async function () {
  * Transfer Dusk from sender psk to reciever psk
  * @param {string} sender bs58 encoded Psk to send the dusk from
  * @param {string} reciever bs68 encoded psk of the address who will receiver the dusk
- * @param {number} amount Amount of dusk to send
+ * @param {number} amount Amount of DUSK to send
  *
  */
 Wallet.prototype.transfer = async function (sender, reciever, amount) {
   return await transfer(this.wasm, this.seed, sender, reciever, amount);
+};
+/**
+ * Stake Dusk from the provided psk, refund to the same psk
+ * @param {string} staker bs58 encoded Psk to send the dusk from
+ * @param {number} amount Amount of dusk to stake
+ */
+Wallet.prototype.stake = async function (staker, amount) {
+  const index = this.getPsks().indexOf(staker);
+
+  if (!index) {
+    throw new Error("Staker psk not found");
+  }
+
+  return await stake(this.wasm, this.seed, index, staker, amount);
+};
+/**
+ * Fetches the info of the stake if the person has staked
+ * @param {string} psk bs58 encoded Psk of the staker
+ * @returns {object} stakeInfoResponse - objec.has_staked, object.eligibility, object.amount, object.reward, object.counter
+ */
+Wallet.prototype.stakeInfo = async function (psk) {
+  const index = this.getPsks().indexOf(psk);
+
+  if (!index) {
+    throw new Error("Staker psk not found");
+  }
+
+  return await stakeInfo(this.wasm, this.seed, index);
 };

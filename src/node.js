@@ -4,16 +4,19 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { call, jsonFromBytes, toBytes } from "./wasm.js";
+import { toBytes } from "./wasm.js";
 import {
   getU64RkyvSerialized,
-  getNotesRkyvSerialized,
   getNullifiersRkyvSerialized,
   getTreeLeafDeserialized,
-  getNullifiersDeserialized,
 } from "./rkyv.js";
-import { stateDB, getLastPos } from "./indexedDB.js";
-import { getNullifiers, checkIfOwned, unspentSpentNotes } from "./crypto.js";
+import {
+  stateDB,
+  getLastPos,
+  getAllUnpsentNotes,
+  deleteUnspentNotesInsertSpentNotes,
+} from "./indexedDB.js";
+import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
 
 // env variables
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
@@ -28,19 +31,19 @@ const LOCAL_NODE = process.env.LOCAL_NODE;
  * We then use the notes to calculate balance and perform staking
  *
  * @param {WebAssembly.Exports} wasm
- * @param {Uint8Array} seed The seed of the wallet
+ * @param {Uint8Array} seed The seed of the walconst
  *
  */
 export async function sync(wasm, seed, node = LOCAL_NODE) {
-  let leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
+  const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
 
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
-  // every invidudal mnemonic wallet has its own last height where it
+  // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  let lastPosDB = await getLastPos();
+  const lastPosDB = await getLastPos();
   // Get the leafs from the position above
-  let resp = await request(
+  const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
@@ -49,24 +52,24 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   // what an indivdual leaf would be
   let leaf;
   // The notes we get from the network which we own.
-  let notes = [];
-  let block_heights = [];
-  let nullifiers = [];
-  let psks = [];
-  let positions = [];
+  const notes = [];
+  const block_heights = [];
+  const nullifiers = [];
+  const psks = [];
+  const positions = [];
   let lastPos = 0;
 
   for await (const chunk of resp.body) {
     for (let i = 0; i < chunk.length; i += leafSize) {
-      const leaf = chunk.slice(i, i + leafSize);
+      leaf = chunk.slice(i, i + leafSize);
       // get the tree leaf rkyv serialized
-      let treeLeaf = getTreeLeafDeserialized(wasm, leaf);
+      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
 
-      let note = treeLeaf.note;
-      let blockHeight = treeLeaf.block_height;
-      let pos = treeLeaf.last_pos;
+      const note = treeLeaf.note;
+      const blockHeight = treeLeaf.block_height;
+      const pos = treeLeaf.last_pos;
 
-      let owned = checkIfOwned(wasm, seed, note);
+      const owned = checkIfOwned(wasm, seed, note);
 
       if (owned.is_owned) {
         lastPos = Math.max(lastPos, pos);
@@ -80,20 +83,20 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     }
   }
 
-  let nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
+  const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
 
   // Fetch existing nullifiers from the node
-  let existingNullifiersRemote = await request(
+  const existingNullifiersRemote = await request(
     nullifiersSerialized,
     "existing_nullifiers",
     false
   );
 
-  let existingNullifiers = await existingNullifiersRemote.arrayBuffer();
+  const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
 
-  let existingNullifiersBytes = new Uint8Array(existingNullifiers);
+  const existingNullifiersBytes = new Uint8Array(existingNullifiers);
 
-  let allNotes = unspentSpentNotes(
+  const allNotes = unspentSpentNotes(
     wasm,
     notes,
     nullifiers,
@@ -101,8 +104,8 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     psks
   );
 
-  let unspentNotes = allNotes.unspent_notes;
-  let spentNotes = allNotes.spent_notes;
+  const unspentNotes = Array.from(allNotes.unspent_notes);
+  const spentNotes = Array.from(allNotes.spent_notes);
 
   // if we have anything to insert then we insert
   if (
@@ -114,6 +117,75 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   ) {
     stateDB(unspentNotes, spentNotes, lastPos);
   }
+
+  // Move the unspent notes to spent notes if they were spent
+  const unspentNotesNullifiers = [];
+  const unspentNotesTemp = [];
+  const unspentNotesPsks = [];
+  const unspentNotesIds = [];
+
+  const correctNotes = async (unspentNotesNullifiers) => {
+    const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
+      wasm,
+      unspentNotesNullifiers
+    );
+
+    // Fetch existing nullifiers from the node
+    const unpsentNotesExistingNullifiersRemote = await request(
+      unspentNotesNullifiersSerialized,
+      "existing_nullifiers",
+      false
+    );
+
+    const unspentNotesExistingNullifiers =
+      await unpsentNotesExistingNullifiersRemote.arrayBuffer();
+
+    const unspentNotesExistingNullifiersBytes = new Uint8Array(
+      unspentNotesExistingNullifiers
+    );
+
+    const correctedNotes = unspentSpentNotes(
+      wasm,
+      unspentNotesTemp,
+      unspentNotesNullifiers,
+      unspentNotesExistingNullifiersBytes,
+      unspentNotesPsks
+    );
+
+    const unspentNotesCorrected = Array.from(correctedNotes.unspent_notes).map(
+      (unspentNotedata) => unspentNotedata.note
+    );
+
+    const idsToRemove = [];
+
+    unspentNotesTemp.forEach((note, index) => {
+      let needsCorrection = true;
+      unspentNotesCorrected.forEach((correctedNote) => {
+        if (compareNotes(note, correctedNote)) {
+          needsCorrection = false;
+        }
+      });
+      if (needsCorrection) {
+        idsToRemove.push(unspentNotesIds[index]);
+      }
+    });
+
+    deleteUnspentNotesInsertSpentNotes(
+      idsToRemove,
+      Array.from(correctedNotes.spent_notes)
+    );
+  };
+
+  getAllUnpsentNotes(async (allUnspentNotes) => {
+    for (const unspentNote of await allUnspentNotes) {
+      unspentNotesNullifiers.push(unspentNote.nullifier);
+      unspentNotesTemp.push(unspentNote.note);
+      unspentNotesPsks.push(unspentNote.psk);
+      unspentNotesIds.push(unspentNote.id);
+    }
+
+    correctNotes(unspentNotesNullifiers);
+  });
 }
 /**
  * By default query the transfer contract unless given otherwise
@@ -133,20 +205,20 @@ export async function request(
   target = TRANSFER_CONTRACT,
   targetType = "1"
 ) {
-  let request_name_bytes = toBytes(request_name);
-  let number = numberToLittleEndianByteArray(request_name.length);
-  let length = number.length + request_name_bytes.length + data.length;
+  const request_name_bytes = toBytes(request_name);
+  const number = numberToLittleEndianByteArray(request_name.length);
+  const length = number.length + request_name_bytes.length + data.length;
 
   // finalize the bytes we send the node as POST request
-  let request = new Uint8Array(length);
+  const request = new Uint8Array(length);
 
   request.set(number, 0);
   request.set(request_name_bytes, number.length);
   request.set(new Uint8Array(data), number.length + request_name_bytes.length);
 
-  let headers = {
+  const headers = {
     "Content-Type": "application/octet-stream",
-    "x-rusk-version": "0.6.0",
+    "rusk-version": "0.7.0-rc",
   };
 
   if (stream) {
@@ -155,7 +227,7 @@ export async function request(
 
   try {
     /// http://127.0.0.1:8080/ + 1/ + 00002 = http://127.0.0.1:8080/1/00002
-    let resp = await fetch(node + targetType + "/" + target, {
+    const resp = await fetch(node + targetType + "/" + target, {
       method: "POST",
       headers: headers,
       body: request,
@@ -174,11 +246,11 @@ export async function request(
  */
 export async function fetchOpenings(pos, node = LOCAL_NODE) {
   try {
-    let response = await request(pos, "opening", false);
+    const response = await request(pos, "opening", false, node);
 
-    let buffer = await response.arrayBuffer();
+    const buffer = await response.arrayBuffer();
 
-    let bytes = new Uint8Array(buffer);
+    const bytes = new Uint8Array(buffer);
     return bytes;
   } catch (e) {
     console.log("Fetching Openings failed: " + e);
@@ -190,11 +262,27 @@ export async function fetchOpenings(pos, node = LOCAL_NODE) {
  * @returns {Uint8Array} the bytes
  */
 function numberToLittleEndianByteArray(num) {
-  let byteArray = new Uint8Array(4); // Assuming a 32-bit number
+  const byteArray = new Uint8Array(4); // Assuming a 32-bit number
 
   for (let i = 0; i < 4; i++) {
     byteArray[i] = (num >> (i * 8)) & 0xff;
   }
 
   return byteArray;
+}
+
+/**
+ * Compare notes and return true or false
+ * @param {Uint8Array} noteOne
+ * @param {Uint8Array} noteTwo
+ * @returns {boolean} true if the notes are equal, false otherwise
+ */
+function compareNotes(noteOne, noteTwo) {
+  let i = noteOne.length;
+
+  while (i--) {
+    if (noteOne[i] !== noteTwo[i]) return false;
+  }
+
+  return true;
 }

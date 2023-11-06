@@ -5,7 +5,7 @@
   <body>
     <div><p>Well this is awkward</p></div>
     <script type="module">
-      import { Wallet } from "../dist/wallet.js";
+      import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
       const initWasm = async () => {
         const { instance } = await WebAssembly.instantiateStreaming(
           fetch("../assets/dusk-wallet-core-0.21.0.wasm")
@@ -13,7 +13,6 @@
 
         let wasm = instance.exports;
 
-        // let mnemonic = generateRandomMnemonic(wasm);
         let seed = [
           153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10,
           115, 19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90,
@@ -22,8 +21,10 @@
           252, 117, 221, 221,
         ];
         let wallet = new Wallet(wasm, seed);
-        let psks = wallet.getPsks();
         let sync = await wallet.sync();
+        let psks = wallet.getPsks();
+
+        console.log(psks[0]);
         wallet.getBalance(psks[0], (bal) => {
           console.log(bal.value);
         });
@@ -32,7 +33,9 @@
           console.log(bal.value);
         });
 
-        // let transfer = wallet.transfer(psks[0], psks[1], 5_000_000_000);
+        // wallet.transfer(psks[0], psks[1], 4000);
+        // wallet.stake(psks[1], 2000);
+        // wallet.stakeInfo();
       };
 
       document.addEventListener("DOMContentLoaded", function (event) {

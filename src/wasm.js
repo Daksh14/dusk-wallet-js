@@ -11,10 +11,10 @@
  * @returns {number} returns the pointer to the allocated buffer
  */
 function alloc(wasm, bytes) {
-  let length = bytes.byteLength;
+  const length = bytes.byteLength;
   try {
-    let ptr = wasm.allocate(length);
-    let mem = new Uint8Array(wasm.memory.buffer, ptr, length);
+    const ptr = wasm.allocate(length);
+    const mem = new Uint8Array(wasm.memory.buffer, ptr, length);
 
     mem.set(new Uint8Array(bytes));
     return ptr;
@@ -44,9 +44,9 @@ function getAndFree(wasm, result) {
  * @returns {object} an object containing ptr, length and status bit
  */
 function decompose(result) {
-  let ptr = result >> 32n;
-  let len = ((result << 32n) & ((1n << 64n) - 1n)) >> 48n;
-  let success = ((result << 63n) & ((1n << 64n) - 1n)) >> 63n == 0n;
+  const ptr = result >> 32n;
+  const len = ((result << 32n) & ((1n << 64n) - 1n)) >> 48n;
+  const success = ((result << 63n) & ((1n << 64n) - 1n)) >> 63n == 0n;
 
   return {
     ptr: Number(ptr.toString()),
@@ -60,8 +60,8 @@ function decompose(result) {
  * @returns {Uint8Array} bytes from the string
  */
 export const toBytes = (string) => {
-  let utf8Encode = new TextEncoder();
-  let bytes = utf8Encode.encode(string);
+  const utf8Encode = new TextEncoder();
+  const bytes = utf8Encode.encode(string);
 
   return bytes;
 };
@@ -71,9 +71,9 @@ export const toBytes = (string) => {
  * @returns {object} Json parsed object
  */
 export function jsonFromBytes(bytes) {
-  let string = new TextDecoder().decode(bytes);
+  const string = new TextDecoder().decode(bytes);
   try {
-    let jsonParsed = JSON.parse(string);
+    const jsonParsed = JSON.parse(string);
     return jsonParsed;
   } catch (e) {
     throw new Error("Error while parsing json output from function");
@@ -87,18 +87,20 @@ export function jsonFromBytes(bytes) {
  * @returns {Uint8Array} bytes return value of the call
  */
 export function call(wasm, args, function_call) {
-  let argBytes = toBytes(args);
+  const argBytes = toBytes(args);
 
-  // allocate the json we want to send to wallet-core
-  let ptr = alloc(wasm, argBytes);
-  let call = function_call(ptr, argBytes.byteLength);
-  let callResult = decompose(call);
+  // allocate the json we want to send to walconst-core
+  const ptr = alloc(wasm, argBytes);
+  const call = function_call(ptr, argBytes.byteLength);
+  const callResult = decompose(call);
+
+  console.log(callResult);
 
   if (!callResult.status) {
     console.error("Function call " + function_call + " failed!");
   }
 
-  let bytes = getAndFree(wasm, callResult);
+  const bytes = getAndFree(wasm, callResult);
 
   return bytes;
 }

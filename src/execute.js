@@ -17,7 +17,8 @@ import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 /**
  *
  * @param {WebAssembly.Exports} wasm
- * @param {Uint8Array} seed - Wallet seed
+ * @param {Uint8Array} seed - Walconst seed
+ * @param {Uint8Array} rng_seed - Seed for the rng
  * @param {string} psk - bs58 encoded public spend key string
  * @param {object} output - Output note parameters
  * @param {object} call - call object
@@ -29,6 +30,7 @@ import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 export function execute(
   wasm,
   seed,
+  rng_seed,
   psk,
   output,
   callData,
@@ -36,47 +38,55 @@ export function execute(
   gas_limit,
   gas_price
 ) {
-  let rng_seed = new Uint8Array(64);
-  crypto.getRandomValues(rng_seed);
-
   getUnpsentNotes(psk, async (notes) => {
-    let openings = [];
-    let allNotes = [];
+    const openings = [];
+    const allNotes = [];
 
-    await Promise.all(
-      notes.map(async (noteData) => {
-        let pos = noteData.pos;
-        let fetchedOpening = await fetchOpenings(
-          getU64RkyvSerialized(wasm, pos)
-        );
+    for (const noteData of notes) {
+      console.log(noteData);
+      const pos = noteData.pos;
+      const fetchedOpening = await fetchOpenings(
+        getU64RkyvSerialized(wasm, pos)
+      );
 
-        openings.push(Array.from(fetchedOpening));
-        allNotes.push(noteData.note);
-      })
+      const opening = Array.from(fetchedOpening);
+
+      if (opening.length > 0) {
+        openings.push(opening);
+      }
+
+      allNotes.push(noteData.note);
+    }
+
+    const openingsSerialized = Array.from(
+      getOpeningsSerialized(wasm, openings)
     );
 
-    let openingsSerialized = getOpeningsSerialized(wasm, openings);
-    let inputs = getNotesRkyvSerialized(wasm, allNotes);
+    console.log("allNotes:", allNotes);
 
-    let args = JSON.stringify({
+    const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
+
+    const args = JSON.stringify({
       call: callData,
       crossover: crossover,
       seed: seed,
       rng_seed: Array.from(rng_seed),
-      inputs: Array.from(inputs),
+      inputs: inputs,
       refund: psk,
       output: output,
-      openings: Array.from(openingsSerialized),
+      openings: openingsSerialized,
       gas_limit: gas_limit,
       gas_price: gas_price,
     });
 
-    let unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
+    console.log(args);
+
+    const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
 
     console.log("unrpovenTx length: " + unprovenTx.length);
 
-    let varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
-    let proofReq = await request(
+    const varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
+    const proofReq = await request(
       varBytes,
       "prove_execute",
       false,
@@ -87,12 +97,12 @@ export function execute(
 
     console.log("prove_execute status code: " + proofReq.status);
 
-    let buffer = await proofReq.arrayBuffer();
-    let bytes = new Uint8Array(buffer);
+    const buffer = await proofReq.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
 
-    let tx = proveTx(wasm, unprovenTx, bytes);
+    const tx = proveTx(wasm, unprovenTx, bytes);
 
-    let preVerifyReq = await request(
+    const preVerifyReq = await request(
       tx,
       "preverify",
       false,
@@ -103,10 +113,7 @@ export function execute(
 
     console.log("preverify request status code: " + preVerifyReq.status);
 
-    let bufferPreVerifyReq = await preVerifyReq.arrayBuffer();
-    let bytesPreVerifyReq = new Uint8Array(bufferPreVerifyReq);
-
-    let propogateReq = await request(
+    const propogateReq = await request(
       tx,
       "propagate_tx",
       false,

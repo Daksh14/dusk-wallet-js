@@ -14,12 +14,12 @@ import { call, jsonFromBytes } from "./wasm.js";
  * @returns {object} json serialized bytes of leaf (note and height)
  */
 export function getTreeLeafDeserialized(wasm, leaf) {
-  // we want to send the data in json to wallet-core
-  let args = JSON.stringify({
+  // we want to send the data in json to walconst-core
+  const args = JSON.stringify({
     bytes: Array.from(leaf),
   });
 
-  let treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
+  const treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
 
   return treeLeaf;
 }
@@ -30,11 +30,11 @@ export function getTreeLeafDeserialized(wasm, leaf) {
  * @returns {Uint8Array} rkyv serialized bytes of the u64
  */
 export function getU64RkyvSerialized(wasm, num) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     value: num,
   });
 
-  let bytes = call(wasm, args, wasm.rkyv_u64);
+  const bytes = call(wasm, args, wasm.rkyv_u64);
 
   return bytes;
 }
@@ -45,11 +45,11 @@ export function getU64RkyvSerialized(wasm, num) {
  * @returns {Uint8Array} rkyv serialized bytes of the Vec<Note>
  */
 export function getNotesRkyvSerialized(wasm, notes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     notes: notes,
   });
 
-  let bytes = call(wasm, args, wasm.rkyv_notes_array);
+  const bytes = call(wasm, args, wasm.rkyv_notes_array);
 
   return bytes;
 }
@@ -60,11 +60,11 @@ export function getNotesRkyvSerialized(wasm, notes) {
  * @returns {Array<Uint8Array>} rkyv serialized bytes Vec<Vec<u8>>
  */
 export function getNullifiersRkyvSerialized(wasm, bytes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     bytes: Array.from(bytes),
   });
 
-  let result = call(wasm, args, wasm.rkyv_bls_scalar_array);
+  const result = call(wasm, args, wasm.rkyv_bls_scalar_array);
 
   return result;
 }
@@ -75,11 +75,11 @@ export function getNullifiersRkyvSerialized(wasm, bytes) {
  * @returns {Array<Uint8Array>} rkyv serialized bytes Vec<Vec<u8>>
  */
 export function getNullifiersDeserialized(wasm, bytes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     bytes: Array.from(bytes),
   });
 
-  let result = jsonFromBytes(call(wasm, args, wasm.bls_scalar_array_rkyv));
+  const result = jsonFromBytes(call(wasm, args, wasm.bls_scalar_array_rkyv));
 
   return result.bytes;
 }
@@ -91,11 +91,11 @@ export function getNullifiersDeserialized(wasm, bytes) {
  * @returns {Uint8Array} rkyv serialized Vec<Openings>
  */
 export function getOpeningsSerialized(wasm, bytes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     openings: bytes,
   });
 
-  let result = call(wasm, args, wasm.rkyv_openings_array);
+  const result = call(wasm, args, wasm.rkyv_openings_array);
 
   return result;
 }

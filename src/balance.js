@@ -7,6 +7,7 @@
 import { call, jsonFromBytes } from "./wasm.js";
 import { getUnpsentNotes } from "./indexedDB.js";
 import { getNotesRkyvSerialized } from "./rkyv.js";
+import { duskToLux } from "./crypto.js";
 
 /**
  * Get balance from given unspent notes and seed
@@ -16,17 +17,23 @@ import { getNotesRkyvSerialized } from "./rkyv.js";
  * @param {callback} callback - function(balance_value) {}
  * @returns {object} balanceResponse - object.maximum and object.value
  */
-export async function getBalance(wasm, seed, psk, callback) {
-  await getUnpsentNotes(psk, function (notes) {
-    let unspentNotes = notes.map((object) => object.note);
+export function getBalance(wasm, seed, psk, callback) {
+  getUnpsentNotes(psk, function (notes) {
+    const unspentNotes = notes.map((object) => object.note);
 
-    let serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
+    const serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
 
-    let balanceArgs = JSON.stringify({
+    const balanceArgs = JSON.stringify({
       seed: Array.from(seed),
       notes: Array.from(serializedNotes),
     });
 
-    callback(jsonFromBytes(call(wasm, balanceArgs, wasm.balance)));
+    const obj = jsonFromBytes(call(wasm, balanceArgs, wasm.balance));
+
+    // convert the dusk values to lux
+    obj.value = duskToLux(wasm, obj.value);
+    obj.maximum = duskToLux(wasm, obj.maximum);
+
+    callback(obj);
   });
 }

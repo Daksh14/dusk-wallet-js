@@ -9,13 +9,30 @@ import { call, jsonFromBytes } from "./wasm.js";
 /**
  * Get the public spend keys in order from 1 to 24 for the seed
  * @param {WebAssembly.Exports} wasm
- * @param {Uint8Array} seed Seed of the wallet
+ * @param {Uint8Array} seed Seed of the walconst
  * @returns {Array<string>} psks base58 encoded public spend keys
  */
 export function getPsks(wasm, seed) {
-  let json = JSON.stringify({
+  const json = JSON.stringify({
     seed: Array.from(seed),
   });
 
   return jsonFromBytes(call(wasm, json, wasm.public_spend_keys)).keys;
+}
+
+/**
+ * Get the PublicKey rkyv serialized for a particular index
+ * needed to fetch stake
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} seed Seed of the walconst
+ * @param {number} index Index of the public spend key
+ * @returns {Uint8Array} public_key rkyv serialized
+ */
+export function getPublicKeyRkyvSerialized(wasm, seed, index) {
+  const json = JSON.stringify({
+    seed: Array.from(seed),
+    index: index,
+  });
+
+  return call(wasm, json, wasm.public_spend_keys);
 }

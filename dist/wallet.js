@@ -5209,10 +5209,10 @@ var require_dexie = __commonJS({
 
 // src/wasm.js
 function alloc(wasm, bytes) {
-  let length = bytes.byteLength;
+  const length = bytes.byteLength;
   try {
-    let ptr = wasm.allocate(length);
-    let mem = new Uint8Array(wasm.memory.buffer, ptr, length);
+    const ptr = wasm.allocate(length);
+    const mem = new Uint8Array(wasm.memory.buffer, ptr, length);
     mem.set(new Uint8Array(bytes));
     return ptr;
   } catch (error) {
@@ -5229,9 +5229,9 @@ function getAndFree(wasm, result) {
   }
 }
 function decompose(result) {
-  let ptr = result >> 32n;
-  let len = (result << 32n & (1n << 64n) - 1n) >> 48n;
-  let success = (result << 63n & (1n << 64n) - 1n) >> 63n == 0n;
+  const ptr = result >> 32n;
+  const len = (result << 32n & (1n << 64n) - 1n) >> 48n;
+  const success = (result << 63n & (1n << 64n) - 1n) >> 63n == 0n;
   return {
     ptr: Number(ptr.toString()),
     length: Number(len.toString()),
@@ -5239,65 +5239,66 @@ function decompose(result) {
   };
 }
 var toBytes = (string) => {
-  let utf8Encode = new TextEncoder();
-  let bytes = utf8Encode.encode(string);
+  const utf8Encode = new TextEncoder();
+  const bytes = utf8Encode.encode(string);
   return bytes;
 };
 function jsonFromBytes(bytes) {
-  let string = new TextDecoder().decode(bytes);
+  const string = new TextDecoder().decode(bytes);
   try {
-    let jsonParsed = JSON.parse(string);
+    const jsonParsed = JSON.parse(string);
     return jsonParsed;
   } catch (e) {
     throw new Error("Error while parsing json output from function");
   }
 }
 function call(wasm, args, function_call) {
-  let argBytes = toBytes(args);
-  let ptr = alloc(wasm, argBytes);
-  let call2 = function_call(ptr, argBytes.byteLength);
-  let callResult = decompose(call2);
+  const argBytes = toBytes(args);
+  const ptr = alloc(wasm, argBytes);
+  const call2 = function_call(ptr, argBytes.byteLength);
+  const callResult = decompose(call2);
+  console.log(callResult);
   if (!callResult.status) {
     console.error("Function call " + function_call + " failed!");
   }
-  let bytes = getAndFree(wasm, callResult);
+  const bytes = getAndFree(wasm, callResult);
   return bytes;
 }
 
 // src/rkyv.js
 function getTreeLeafDeserialized(wasm, leaf) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     bytes: Array.from(leaf)
   });
-  let treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
+  const treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
   return treeLeaf;
 }
 function getU64RkyvSerialized(wasm, num) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     value: num
   });
-  let bytes = call(wasm, args, wasm.rkyv_u64);
+  const bytes = call(wasm, args, wasm.rkyv_u64);
   return bytes;
 }
 function getNotesRkyvSerialized(wasm, notes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     notes
   });
-  let bytes = call(wasm, args, wasm.rkyv_notes_array);
+  const bytes = call(wasm, args, wasm.rkyv_notes_array);
   return bytes;
 }
 function getNullifiersRkyvSerialized(wasm, bytes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     bytes: Array.from(bytes)
   });
-  let result = call(wasm, args, wasm.rkyv_bls_scalar_array);
+  const result = call(wasm, args, wasm.rkyv_bls_scalar_array);
   return result;
 }
 function getOpeningsSerialized(wasm, bytes) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     openings: bytes
   });
-  let result = call(wasm, args, wasm.rkyv_openings_array);
+  const result = call(wasm, args, wasm.rkyv_openings_array);
   return result;
 }
 
@@ -5310,14 +5311,16 @@ function stateDB(unspentNotes, spentNotes, pos) {
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,pos,psk,note",
-    spentNotes: "++id,pos,psk,note"
+    unspentNotes: "++id,pos,psk,nullifier",
+    spentNotes: "++id,pos,psk,nullifier"
   });
   try {
     localStorage.setItem("lastPos", pos.toString());
     console.log("Set last pos in local storage: " + pos);
   } catch (e) {
-    console.error("Cannot set pos in local storage, the wallet might be slow");
+    console.error(
+      "Cannot set pos in local storage, the walconst might be slow"
+    );
   }
   db.unspentNotes.bulkPut(unspentNotes).then(() => {
     console.log("Persisted unspent notes");
@@ -5334,7 +5337,7 @@ function stateDB(unspentNotes, spentNotes, pos) {
     );
   });
 }
-async function getUnpsentNotes(psk, callback) {
+function getUnpsentNotes(psk, callback) {
   const db = new import_dexie.Dexie("state");
   db.open().then(async (db2) => {
     const myTable = db2.table("unspentNotes");
@@ -5363,21 +5366,50 @@ async function getLastPos() {
     }
   } catch (e) {
     console.error(
-      "Cannot retrieve lastPos in local storage, the wallet might be slow"
+      "Cannot retrieve lastPos in local storage, the walconst might be slow"
     );
   }
+}
+function getAllUnpsentNotes(callback) {
+  const db = new import_dexie.Dexie("state");
+  db.open().then((db2) => {
+    const myTable = db2.table("unspentNotes");
+    if (myTable) {
+      const result = myTable.toArray();
+      callback(result);
+    }
+  }).catch((error) => {
+    console.error("Error while getting all unspent notes: " + error);
+  });
+}
+function deleteUnspentNotesInsertSpentNotes(unspentNotesIds, spentNotes) {
+  const db = new import_dexie.Dexie("state");
+  db.open().then((db2) => {
+    const unspentNotesTable = db2.table("unspentNotes");
+    if (unspentNotesTable) {
+      unspentNotesTable.bulkDelete(unspentNotesIds);
+    }
+    const spentNotesTable = db2.table("spentNotes");
+    if (spentNotesTable) {
+      spentNotesTable.bulkPut(spentNotes);
+    }
+  }).catch(import_dexie.Dexie.BulkError, function(e) {
+    console.error(
+      "Some insert operations did not while deleting unspent notes. " + e.failures.length + " failures"
+    );
+  });
 }
 
 // src/crypto.js
 function checkIfOwned(wasm, seed, note) {
-  let json = JSON.stringify({
+  const json = JSON.stringify({
     seed: Array.from(seed),
     note: Array.from(note)
   });
   return jsonFromBytes(call(wasm, json, wasm.check_note_ownership));
 }
 function unspentSpentNotes(wasm, notes, nullifiersOfNote, existingNullifiers, psks) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     notes,
     nullifiers_of_notes: nullifiersOfNote,
     existing_nullifiers: Array.from(existingNullifiers),
@@ -5385,35 +5417,47 @@ function unspentSpentNotes(wasm, notes, nullifiersOfNote, existingNullifiers, ps
   });
   return jsonFromBytes(call(wasm, args, wasm.unspent_spent_notes));
 }
+function duskToLux(wasm, dusk) {
+  const args = JSON.stringify({
+    dusk
+  });
+  return jsonFromBytes(call(wasm, args, wasm.dusk_to_lux)).lux;
+}
+function luxToDusk(wasm, lux) {
+  const args = JSON.stringify({
+    lux
+  });
+  return jsonFromBytes(call(wasm, args, wasm.lux_to_dusk)).dusk;
+}
 
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
 var LOCAL_NODE = "http://127.0.0.1:8080/";
 async function sync(wasm, seed, node = LOCAL_NODE) {
-  let leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
-  let lastPosDB = await getLastPos();
-  let resp = await request(
+  const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
+  const lastPosDB = await getLastPos();
+  const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
     node
   );
   let leaf;
-  let notes = [];
-  let block_heights = [];
-  let nullifiers = [];
-  let psks = [];
-  let positions = [];
+  const notes = [];
+  const block_heights = [];
+  const nullifiers = [];
+  const psks = [];
+  const positions = [];
   let lastPos = 0;
   for await (const chunk of resp.body) {
     for (let i = 0; i < chunk.length; i += leafSize) {
-      const leaf2 = chunk.slice(i, i + leafSize);
-      let treeLeaf = getTreeLeafDeserialized(wasm, leaf2);
-      let note = treeLeaf.note;
-      let blockHeight = treeLeaf.block_height;
-      let pos = treeLeaf.last_pos;
-      let owned = checkIfOwned(wasm, seed, note);
+      leaf = chunk.slice(i, i + leafSize);
+      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
+      const note = treeLeaf.note;
+      const blockHeight = treeLeaf.block_height;
+      const pos = treeLeaf.last_pos;
+      const owned = checkIfOwned(wasm, seed, note);
       if (owned.is_owned) {
         lastPos = Math.max(lastPos, pos);
         notes.push(note);
@@ -5424,46 +5468,100 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
       }
     }
   }
-  let nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
-  let existingNullifiersRemote = await request(
+  const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
+  const existingNullifiersRemote = await request(
     nullifiersSerialized,
     "existing_nullifiers",
     false
   );
-  let existingNullifiers = await existingNullifiersRemote.arrayBuffer();
-  let existingNullifiersBytes = new Uint8Array(existingNullifiers);
-  let allNotes = unspentSpentNotes(
+  const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
+  const existingNullifiersBytes = new Uint8Array(existingNullifiers);
+  const allNotes = unspentSpentNotes(
     wasm,
     notes,
     nullifiers,
     existingNullifiersBytes,
     psks
   );
-  let unspentNotes = allNotes.unspent_notes;
-  let spentNotes = allNotes.spent_notes;
+  const unspentNotes = Array.from(allNotes.unspent_notes);
+  const spentNotes = Array.from(allNotes.spent_notes);
   if (unspentNotes.length > 0 || spentNotes.length > 0 || // if the last pos we get from the node is bigger than the
   // last pos we have on the db then we need to update it
   lastPos >= lastPosDB) {
     stateDB(unspentNotes, spentNotes, lastPos);
   }
+  const unspentNotesNullifiers = [];
+  const unspentNotesTemp = [];
+  const unspentNotesPsks = [];
+  const unspentNotesIds = [];
+  const correctNotes = async (unspentNotesNullifiers2) => {
+    const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
+      wasm,
+      unspentNotesNullifiers2
+    );
+    const unpsentNotesExistingNullifiersRemote = await request(
+      unspentNotesNullifiersSerialized,
+      "existing_nullifiers",
+      false
+    );
+    const unspentNotesExistingNullifiers = await unpsentNotesExistingNullifiersRemote.arrayBuffer();
+    const unspentNotesExistingNullifiersBytes = new Uint8Array(
+      unspentNotesExistingNullifiers
+    );
+    const correctedNotes = unspentSpentNotes(
+      wasm,
+      unspentNotesTemp,
+      unspentNotesNullifiers2,
+      unspentNotesExistingNullifiersBytes,
+      unspentNotesPsks
+    );
+    const unspentNotesCorrected = Array.from(correctedNotes.unspent_notes).map(
+      (unspentNotedata) => unspentNotedata.note
+    );
+    const idsToRemove = [];
+    unspentNotesTemp.forEach((note, index) => {
+      let needsCorrection = true;
+      unspentNotesCorrected.forEach((correctedNote) => {
+        if (compareNotes(note, correctedNote)) {
+          needsCorrection = false;
+        }
+      });
+      if (needsCorrection) {
+        idsToRemove.push(unspentNotesIds[index]);
+      }
+    });
+    deleteUnspentNotesInsertSpentNotes(
+      idsToRemove,
+      Array.from(correctedNotes.spent_notes)
+    );
+  };
+  getAllUnpsentNotes(async (allUnspentNotes) => {
+    for (const unspentNote of await allUnspentNotes) {
+      unspentNotesNullifiers.push(unspentNote.nullifier);
+      unspentNotesTemp.push(unspentNote.note);
+      unspentNotesPsks.push(unspentNote.psk);
+      unspentNotesIds.push(unspentNote.id);
+    }
+    correctNotes(unspentNotesNullifiers);
+  });
 }
 async function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFER_CONTRACT, targetType = "1") {
-  let request_name_bytes = toBytes(request_name);
-  let number = numberToLittleEndianByteArray(request_name.length);
-  let length = number.length + request_name_bytes.length + data.length;
-  let request2 = new Uint8Array(length);
+  const request_name_bytes = toBytes(request_name);
+  const number = numberToLittleEndianByteArray(request_name.length);
+  const length = number.length + request_name_bytes.length + data.length;
+  const request2 = new Uint8Array(length);
   request2.set(number, 0);
   request2.set(request_name_bytes, number.length);
   request2.set(new Uint8Array(data), number.length + request_name_bytes.length);
-  let headers = {
+  const headers = {
     "Content-Type": "application/octet-stream",
-    "x-rusk-version": "0.6.0"
+    "rusk-version": "0.7.0-rc"
   };
   if (stream) {
     headers["Rusk-Feeder"] = "1";
   }
   try {
-    let resp = await fetch(node + targetType + "/" + target, {
+    const resp = await fetch(node + targetType + "/" + target, {
       method: "POST",
       headers,
       body: request2
@@ -5475,96 +5573,134 @@ async function request(data, request_name, stream, node = LOCAL_NODE, target = T
 }
 async function fetchOpenings(pos, node = LOCAL_NODE) {
   try {
-    let response = await request(pos, "opening", false);
-    let buffer = await response.arrayBuffer();
-    let bytes = new Uint8Array(buffer);
+    const response = await request(pos, "opening", false, node);
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
     return bytes;
   } catch (e) {
     console.log("Fetching Openings failed: " + e);
   }
 }
 function numberToLittleEndianByteArray(num) {
-  let byteArray = new Uint8Array(4);
+  const byteArray = new Uint8Array(4);
   for (let i = 0; i < 4; i++) {
     byteArray[i] = num >> i * 8 & 255;
   }
   return byteArray;
 }
+function compareNotes(noteOne, noteTwo) {
+  let i = noteOne.length;
+  while (i--) {
+    if (noteOne[i] !== noteTwo[i])
+      return false;
+  }
+  return true;
+}
+
+// src/mnemonic.js
+function generateRandomMnemonic(wasm) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+  const json = JSON.stringify({
+    rng_seed: Array.from(rng_seed)
+  });
+  return jsonFromBytes(call(wasm, json, wasm.new_mnemonic)).mnemonic_string;
+}
+function getSeedFromMnemonic(wasm, mnemonic, passphrase) {
+  const json = JSON.stringify({
+    mnemonic,
+    passphrase
+  });
+  return jsonFromBytes(call(wasm, json, wasm.get_mnemonic_seed)).mnemonic_seed;
+}
 
 // src/keys.js
 function getPsks(wasm, seed) {
-  let json = JSON.stringify({
+  const json = JSON.stringify({
     seed: Array.from(seed)
   });
   return jsonFromBytes(call(wasm, json, wasm.public_spend_keys)).keys;
 }
+function getPublicKeyRkyvSerialized(wasm, seed, index) {
+  const json = JSON.stringify({
+    seed: Array.from(seed),
+    index
+  });
+  return call(wasm, json, wasm.public_spend_keys);
+}
 
 // src/balance.js
-async function getBalance(wasm, seed, psk, callback) {
-  await getUnpsentNotes(psk, function(notes) {
-    let unspentNotes = notes.map((object) => object.note);
-    let serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
-    let balanceArgs = JSON.stringify({
+function getBalance(wasm, seed, psk, callback) {
+  getUnpsentNotes(psk, function(notes) {
+    const unspentNotes = notes.map((object) => object.note);
+    const serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
+    const balanceArgs = JSON.stringify({
       seed: Array.from(seed),
       notes: Array.from(serializedNotes)
     });
-    callback(jsonFromBytes(call(wasm, balanceArgs, wasm.balance)));
+    const obj = jsonFromBytes(call(wasm, balanceArgs, wasm.balance));
+    obj.value = duskToLux(wasm, obj.value);
+    obj.maximum = duskToLux(wasm, obj.maximum);
+    callback(obj);
   });
 }
 
 // src/tx.js
 function getUnprovenTxVarBytes(wasm, unprovenTx) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     bytes: unprovenTx
   });
-  let result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
+  const result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
   return result.serialized;
 }
 function proveTx(wasm, unprovenTx, proof) {
-  let args = JSON.stringify({
+  const args = JSON.stringify({
     unproven_tx: unprovenTx,
     proof: Array.from(proof)
   });
-  console.log(args);
-  let result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
+  const result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
   return result.bytes;
 }
 
 // src/execute.js
-function execute(wasm, seed, psk, output, callData, crossover, gas_limit, gas_price) {
-  let rng_seed = new Uint8Array(64);
-  crypto.getRandomValues(rng_seed);
+function execute(wasm, seed, rng_seed, psk, output, callData, crossover, gas_limit, gas_price) {
   getUnpsentNotes(psk, async (notes) => {
-    let openings = [];
-    let allNotes = [];
-    await Promise.all(
-      notes.map(async (noteData) => {
-        let pos = noteData.pos;
-        let fetchedOpening = await fetchOpenings(
-          getU64RkyvSerialized(wasm, pos)
-        );
-        openings.push(Array.from(fetchedOpening));
-        allNotes.push(noteData.note);
-      })
+    const openings = [];
+    const allNotes = [];
+    for (const noteData of notes) {
+      console.log(noteData);
+      const pos = noteData.pos;
+      const fetchedOpening = await fetchOpenings(
+        getU64RkyvSerialized(wasm, pos)
+      );
+      const opening = Array.from(fetchedOpening);
+      if (opening.length > 0) {
+        openings.push(opening);
+      }
+      allNotes.push(noteData.note);
+    }
+    const openingsSerialized = Array.from(
+      getOpeningsSerialized(wasm, openings)
     );
-    let openingsSerialized = getOpeningsSerialized(wasm, openings);
-    let inputs = getNotesRkyvSerialized(wasm, allNotes);
-    let args = JSON.stringify({
+    console.log("allNotes:", allNotes);
+    const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
+    const args = JSON.stringify({
       call: callData,
       crossover,
       seed,
       rng_seed: Array.from(rng_seed),
-      inputs: Array.from(inputs),
+      inputs,
       refund: psk,
       output,
-      openings: Array.from(openingsSerialized),
+      openings: openingsSerialized,
       gas_limit,
       gas_price
     });
-    let unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
-    console.log("unrpovenTx: " + unprovenTx);
-    let varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
-    let proofReq = await request(
+    console.log(args);
+    const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
+    console.log("unrpovenTx length: " + unprovenTx.length);
+    const varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
+    const proofReq = await request(
       varBytes,
       "prove_execute",
       false,
@@ -5572,11 +5708,11 @@ function execute(wasm, seed, psk, output, callData, crossover, gas_limit, gas_pr
       "rusk",
       "2"
     );
-    console.log("Prove_execute statsu code: " + proofReq.status);
-    let buffer = await proofReq.arrayBuffer();
-    let bytes = new Uint8Array(buffer);
-    let tx = proveTx(wasm, unprovenTx, bytes);
-    let preVerifyReq = await request(
+    console.log("prove_execute status code: " + proofReq.status);
+    const buffer = await proofReq.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const tx = proveTx(wasm, unprovenTx, bytes);
+    const preVerifyReq = await request(
       tx,
       "preverify",
       false,
@@ -5584,10 +5720,8 @@ function execute(wasm, seed, psk, output, callData, crossover, gas_limit, gas_pr
       "rusk",
       "2"
     );
-    console.log("Preverify request status code: " + preVerifyReq.status);
-    let bufferPreVerifyReq = await preVerifyReq.arrayBuffer();
-    let bytesPreVerifyReq = new Uint8Array(bufferPreVerifyReq);
-    let propogateReq = await request(
+    console.log("preverify request status code: " + preVerifyReq.status);
+    const propogateReq = await request(
       tx,
       "propagate_tx",
       false,
@@ -5595,19 +5729,124 @@ function execute(wasm, seed, psk, output, callData, crossover, gas_limit, gas_pr
       "Chain",
       "2"
     );
-    console.log("Propogating chain request status: " + propogateReq.status());
+    console.log("propogating chain request status: " + propogateReq.status);
   });
 }
 
-// src/transfer.js
-async function transfer(wasm, seed, sender, receiver, amount) {
-  let output = {
+// src/contracts/transfer.js
+function transfer(wasm, seed, sender, receiver, amount) {
+  amount = luxToDusk(wasm, amount);
+  const output = {
     receiver,
     note_type: "Obfuscated",
+    // TODO: generate ref_id(s)
     ref_id: 1,
     value: amount
   };
-  execute(wasm, seed, sender, output, void 0, void 0, 5e8, 1);
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    sender,
+    output,
+    void 0,
+    void 0,
+    5e8,
+    1
+  );
+}
+
+// src/contracts/stake.js
+async function stake(wasm, seed, sender_index, refund, amount) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+  amount = luxToDusk(wasm, amount);
+  const info = await stakeInfo(wasm, seed, sender_index);
+  let counter = 0;
+  if (info.counter) {
+    counter = info.counter;
+  }
+  const args = JSON.stringify({
+    rng_seed: Array.from(rng_seed),
+    seed,
+    refund,
+    value: amount,
+    sender_index,
+    gas_limit: 5e8,
+    gas_price: 1
+  });
+  console.log(args);
+  const stctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_stct_proof));
+  const stctProofBytes = stctProofArgs.bytes;
+  const crossover = stctProofArgs.crossover;
+  const blinder = stctProofArgs.blinder;
+  const stctProofReq = await request(
+    stctProofBytes,
+    "prove_stct",
+    false,
+    void 0,
+    "rusk",
+    "2"
+  );
+  const bufferStctProofReq = await stctProofReq.arrayBuffer();
+  console.log(
+    "stct proof request response length: " + bufferStctProofReq.byteLength
+  );
+  const callDataArgs = JSON.stringify({
+    staker_index: sender_index,
+    seed,
+    spend_proof: Array.from(new Uint8Array(bufferStctProofReq)),
+    value: amount,
+    counter
+  });
+  const stakeCallData = jsonFromBytes(
+    call(wasm, callDataArgs, wasm.get_stake_call_data)
+  );
+  const contract = stakeCallData.contract;
+  const method = stakeCallData.method;
+  const payload = stakeCallData.payload;
+  const callData = {
+    contract,
+    method,
+    payload
+  };
+  const crossoverType = {
+    crossover,
+    blinder,
+    value: amount
+  };
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    refund,
+    void 0,
+    callData,
+    crossoverType,
+    5e8,
+    1
+  );
+}
+async function stakeInfo(wasm, seed, index) {
+  const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
+  console.log("Fetching stake info");
+  const stakeInfoRequest = await request(
+    pk,
+    "get_stake",
+    false,
+    void 0,
+    "0200000000000000000000000000000000000000000000000000000000000000",
+    "1"
+  );
+  const stakeInfoRequestBuffer = await stakeInfoRequest.arrayBuffer();
+  const stakeInfoRequestBytes = new Uint8Array(stakeInfoRequestBuffer);
+  const args = JSON.stringify({
+    stake_info: Array.from(stakeInfoRequestBytes)
+  });
+  const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
+  return info;
 }
 
 // src/mod.js
@@ -5618,7 +5857,7 @@ function Wallet(wasmExports, seed) {
 Wallet.prototype.getBalance = function(psk, callback) {
   getBalance(this.wasm, this.seed, psk, callback);
 };
-Wallet.prototype.getPsks = function(k) {
+Wallet.prototype.getPsks = function() {
   return getPsks(this.wasm, this.seed);
 };
 Wallet.prototype.sync = async function() {
@@ -5627,8 +5866,24 @@ Wallet.prototype.sync = async function() {
 Wallet.prototype.transfer = async function(sender, reciever, amount) {
   return await transfer(this.wasm, this.seed, sender, reciever, amount);
 };
+Wallet.prototype.stake = async function(staker, amount) {
+  const index = this.getPsks().indexOf(staker);
+  if (!index) {
+    throw new Error("Staker psk not found");
+  }
+  return await stake(this.wasm, this.seed, index, staker, amount);
+};
+Wallet.prototype.stakeInfo = async function(psk) {
+  const index = this.getPsks().indexOf(psk);
+  if (!index) {
+    throw new Error("Staker psk not found");
+  }
+  return await stakeInfo(this.wasm, this.seed, index);
+};
 export {
-  Wallet
+  Wallet,
+  generateRandomMnemonic,
+  getSeedFromMnemonic
 };
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation.

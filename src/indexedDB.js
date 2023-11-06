@@ -18,15 +18,17 @@ export function stateDB(unspentNotes, spentNotes, pos) {
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,pos,psk,note",
-    spentNotes: "++id,pos,psk,note",
+    unspentNotes: "++id,pos,psk,nullifier",
+    spentNotes: "++id,pos,psk,nullifier",
   });
 
   try {
     localStorage.setItem("lastPos", pos.toString());
     console.log("Set last pos in local storage: " + pos);
   } catch (e) {
-    console.error("Cannot set pos in local storage, the wallet might be slow");
+    console.error(
+      "Cannot set pos in local storage, the walconst might be slow"
+    );
   }
 
   db.unspentNotes
@@ -62,7 +64,7 @@ export function stateDB(unspentNotes, spentNotes, pos) {
  * @param {Function} callback - function(unspent_notes_array) {}
  * @returns {object} notes - unspent notes of the psk
  */
-export async function getUnpsentNotes(psk, callback) {
+export function getUnpsentNotes(psk, callback) {
   const db = new Dexie("state");
 
   db.open()
@@ -84,7 +86,7 @@ export async function getUnpsentNotes(psk, callback) {
  * @param {string} psk - bs58 encoded public spend key to fetch the unspent notes of
  * @returns {object} notes-  spent notes of the psk
  */
-export async function getSpentNotes(psk, callback) {
+export function getSpentNotes(psk, callback) {
   const db = new Dexie("state");
 
   db.open()
@@ -123,7 +125,59 @@ export async function getLastPos() {
     }
   } catch (e) {
     console.error(
-      "Cannot retrieve lastPos in local storage, the wallet might be slow"
+      "Cannot retrieve lastPos in local storage, the walconst might be slow"
     );
   }
+}
+
+/**
+ * Fetch all unspent notes from the IndexedDB if there are any
+ * @param {Function} callback - function(all_unspent_notes) {}
+ */
+export function getAllUnpsentNotes(callback) {
+  const db = new Dexie("state");
+
+  db.open()
+    .then((db) => {
+      const myTable = db.table("unspentNotes");
+      if (myTable) {
+        const result = myTable.toArray();
+        callback(result);
+      }
+    })
+    .catch((error) => {
+      console.error("Error while getting all unspent notes: " + error);
+    });
+}
+
+/**  Delete unspent notes given their ids and insert spent notes given data
+/* @param {Array<number>} unspentNotesIds - ids of the unspent notes to delete
+/* @param {Array<object>} spentNotes - spent notes to insert
+*/
+export function deleteUnspentNotesInsertSpentNotes(
+  unspentNotesIds,
+  spentNotes
+) {
+  const db = new Dexie("state");
+
+  db.open()
+    .then((db) => {
+      const unspentNotesTable = db.table("unspentNotes");
+      if (unspentNotesTable) {
+        unspentNotesTable.bulkDelete(unspentNotesIds);
+      }
+
+      const spentNotesTable = db.table("spentNotes");
+
+      if (spentNotesTable) {
+        spentNotesTable.bulkPut(spentNotes);
+      }
+    })
+    .catch(Dexie.BulkError, function (e) {
+      console.error(
+        "Some insert operations did not while deleting unspent notes. " +
+          e.failures.length +
+          " failures"
+      );
+    });
 }
