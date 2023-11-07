@@ -165,6 +165,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
           needsCorrection = false;
         }
       });
+
       if (needsCorrection) {
         idsToRemove.push(unspentNotesIds[index]);
       }

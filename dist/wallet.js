@@ -5626,7 +5626,7 @@ function getPublicKeyRkyvSerialized(wasm, seed, index) {
     seed: Array.from(seed),
     index
   });
-  return call(wasm, json, wasm.public_spend_keys);
+  return call(wasm, json, wasm.get_public_key_rkyv_serialized);
 }
 
 // src/balance.js
@@ -5663,7 +5663,7 @@ function proveTx(wasm, unprovenTx, proof) {
 }
 
 // src/execute.js
-function execute(wasm, seed, rng_seed, psk, output, callData, crossover, gas_limit, gas_price) {
+function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, gas_limit, gas_price) {
   getUnpsentNotes(psk, async (notes) => {
     const openings = [];
     const allNotes = [];
@@ -5688,6 +5688,7 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, gas_lim
       call: callData,
       crossover,
       seed,
+      fee,
       rng_seed: Array.from(rng_seed),
       inputs,
       refund: psk,
@@ -5753,6 +5754,7 @@ function transfer(wasm, seed, sender, receiver, amount) {
     output,
     void 0,
     void 0,
+    void 0,
     5e8,
     1
   );
@@ -5774,7 +5776,7 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     refund,
     value: amount,
     sender_index,
-    gas_limit: 5e8,
+    gas_limit: 29e8,
     gas_price: 1
   });
   console.log(args);
@@ -5782,6 +5784,7 @@ async function stake(wasm, seed, sender_index, refund, amount) {
   const stctProofBytes = stctProofArgs.bytes;
   const crossover = stctProofArgs.crossover;
   const blinder = stctProofArgs.blinder;
+  const fee = stctProofArgs.fee;
   const stctProofReq = await request(
     stctProofBytes,
     "prove_stct",
@@ -5801,6 +5804,7 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     value: amount,
     counter
   });
+  console.log(callDataArgs);
   const stakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_stake_call_data)
   );
@@ -5825,7 +5829,8 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     void 0,
     callData,
     crossoverType,
-    5e8,
+    fee,
+    29e8,
     1
   );
 }
@@ -5846,6 +5851,8 @@ async function stakeInfo(wasm, seed, index) {
     stake_info: Array.from(stakeInfoRequestBytes)
   });
   const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
+  let epoch = info.eligiblity / 2160;
+  info["epoch"] = epoch;
   return info;
 }
 

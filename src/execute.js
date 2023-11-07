@@ -35,6 +35,7 @@ export function execute(
   output,
   callData,
   crossover,
+  fee,
   gas_limit,
   gas_price
 ) {
@@ -70,6 +71,7 @@ export function execute(
       call: callData,
       crossover: crossover,
       seed: seed,
+      fee: fee,
       rng_seed: Array.from(rng_seed),
       inputs: inputs,
       refund: psk,

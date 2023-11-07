@@ -34,5 +34,5 @@ export function getPublicKeyRkyvSerialized(wasm, seed, index) {
     index: index,
   });
 
-  return call(wasm, json, wasm.public_spend_keys);
+  return call(wasm, json, wasm.get_public_key_rkyv_serialized);
 }

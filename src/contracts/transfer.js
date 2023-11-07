@@ -38,6 +38,7 @@ export function transfer(wasm, seed, sender, receiver, amount) {
     output,
     undefined,
     undefined,
+    undefined,
     500000000,
     1
   );

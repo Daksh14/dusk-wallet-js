@@ -10,6 +10,14 @@ import { request } from "../node.js";
 import { execute } from "../execute.js";
 import { getPsks, getPublicKeyRkyvSerialized } from "../keys.js";
 
+/**
+ *
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} seed
+ * @param {number} sender_index Index of the staker
+ * @param {string} refund Where to refund this transaction to
+ * @param {number} amount amount to stake
+ */
 export async function stake(wasm, seed, sender_index, refund, amount) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
@@ -31,7 +39,7 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
     refund: refund,
     value: amount,
     sender_index: sender_index,
-    gas_limit: 500000000,
+    gas_limit: 2900000000,
     gas_price: 1,
   });
 
@@ -42,6 +50,7 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
   const stctProofBytes = stctProofArgs.bytes;
   const crossover = stctProofArgs.crossover;
   const blinder = stctProofArgs.blinder;
+  const fee = stctProofArgs.fee;
 
   const stctProofReq = await request(
     stctProofBytes,
@@ -65,6 +74,8 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
     value: amount,
     counter: counter,
   });
+
+  console.log(callDataArgs);
 
   const stakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_stake_call_data)
@@ -94,16 +105,18 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
     undefined,
     callData,
     crossoverType,
-    500000000,
+    fee,
+    2900000000,
     1
   );
 }
 
 /**
- * Obtain the stake info from the network
+ * Fetch the stake info from the network
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed
  * @param {number} psk
+ * @returns {object} - object.has_staked, object.eligibility, object.amount, object.reward, object.counter, object.epoch
  */
 export async function stakeInfo(wasm, seed, index) {
   const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
@@ -129,11 +142,17 @@ export async function stakeInfo(wasm, seed, index) {
 
   const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
 
+  let epoch = info.eligiblity / 2160;
+
+  info["epoch"] = epoch;
+
   return info;
+}
+
+async function unstake(wasm, seed, sender_index,) {
+  const pk = 
 }
 
 async function stakeAllow() {}
 
 async function withdrawReward() {}
-
-async function unstake() {}
