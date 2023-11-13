@@ -24,7 +24,6 @@
         let sync = await wallet.sync();
         let psks = wallet.getPsks();
 
-        console.log(psks[0]);
         wallet.getBalance(psks[0], (bal) => {
           console.log(bal.value);
         });
@@ -35,7 +34,9 @@
 
         // wallet.transfer(psks[0], psks[1], 4000);
         // wallet.stake(psks[1], 2000);
-        console.log(await wallet.stakeInfo(psks[1]));
+        // console.log(await wallet.stakeInfo(psks[1]));
+        // wallet.unstake(psks[1]);
+        // wallet.stakeAllow(psks[2]);
       };
 
       document.addEventListener("DOMContentLoaded", function (event) {

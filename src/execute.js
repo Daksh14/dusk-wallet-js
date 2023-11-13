@@ -10,7 +10,9 @@ import {
   getNotesRkyvSerialized,
   getOpeningsSerialized,
   getU64RkyvSerialized,
+  getNullifiersRkyvSerialized,
 } from "./rkyv.js";
+import { unspentSpentNotes } from "./crypto.js";
 import { call, jsonFromBytes } from "./wasm.js";
 import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 
@@ -21,11 +23,11 @@ import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
  * @param {Uint8Array} rng_seed - Seed for the rng
  * @param {string} psk - bs58 encoded public spend key string
  * @param {object} output - Output note parameters
- * @param {object} call - call object
- * @param {object} crossover - crossover object
+ * @param {object} callData - callData.method callData.payload callData.contract
+ * @param {object} crossover - crossover.blinder crossover.value crossover.crossover
+ * @param {any} fee - Fee rkyv serialized
  * @param {number} gas_limit - gas_limit value
  * @param {number} gas_price - gas_price value
- * @param {Function} callback - callback(unproven_trasnaction_bytes)
  */
 export function execute(
   wasm,
@@ -42,9 +44,10 @@ export function execute(
   getUnpsentNotes(psk, async (notes) => {
     const openings = [];
     const allNotes = [];
+    const psks = [];
+    const nullifiers = [];
 
     for (const noteData of notes) {
-      console.log(noteData);
       const pos = noteData.pos;
       const fetchedOpening = await fetchOpenings(
         getU64RkyvSerialized(wasm, pos)
@@ -57,13 +60,38 @@ export function execute(
       }
 
       allNotes.push(noteData.note);
+      psks.push(noteData.psk);
+      nullifiers.push(noteData.nullifier);
+
+      console.log(noteData.pos);
     }
+
+    const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
+
+    // Fetch existing nullifiers from the node
+    const existingNullifiersRemote = await request(
+      nullifiersSerialized,
+      "existing_nullifiers",
+      false
+    );
+
+    const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
+
+    const existingNullifiersBytes = new Uint8Array(existingNullifiers);
+
+    const sortedNotes = unspentSpentNotes(
+      wasm,
+      allNotes,
+      nullifiers,
+      existingNullifiersBytes,
+      psks
+    );
+
+    console.log(sortedNotes);
 
     const openingsSerialized = Array.from(
       getOpeningsSerialized(wasm, openings)
     );
-
-    console.log("allNotes:", allNotes);
 
     const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
 

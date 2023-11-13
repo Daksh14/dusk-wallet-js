@@ -7,9 +7,10 @@
 import { sync } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import { getPsks } from "./keys.js";
+import { duskToLux } from "./crypto.js";
 import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
-import { stake, stakeInfo } from "./contracts/stake.js";
+import { stake, stakeInfo, unstake, stakeAllow } from "./contracts/stake.js";
 
 // Export mnemnoic functions
 export { generateRandomMnemonic, getSeedFromMnemonic };
@@ -61,17 +62,34 @@ Wallet.prototype.transfer = async function (sender, reciever, amount) {
 };
 /**
  * Stake Dusk from the provided psk, refund to the same psk
- * @param {string} staker bs58 encoded Psk to send the dusk from
+ * @param {string} staker bs58 encoded Psk to stake from
  * @param {number} amount Amount of dusk to stake
  */
 Wallet.prototype.stake = async function (staker, amount) {
+  const minStake = 1000;
   const index = this.getPsks().indexOf(staker);
+
+  if (amount < minStake) {
+    throw new Error(`Stake amount needs to be above a ${minStake} dusk`);
+  }
 
   if (!index) {
     throw new Error("Staker psk not found");
   }
 
-  return await stake(this.wasm, this.seed, index, staker, amount);
+  const stakeAmount = async () => {
+    return await stake(this.wasm, this.seed, index, staker, amount);
+  };
+
+  this.getBalance(staker, async (bal) => {
+    if (bal.value < minStake) {
+      throw new Error(
+        `Balance needs to be greater than min stake amount of ${minStake}`
+      );
+    } else {
+      await stakeAmount();
+    }
+  });
 };
 /**
  * Fetches the info of the stake if the person has staked
@@ -85,5 +103,38 @@ Wallet.prototype.stakeInfo = async function (psk) {
     throw new Error("Staker psk not found");
   }
 
-  return await stakeInfo(this.wasm, this.seed, index);
+  const info = await stakeInfo(this.wasm, this.seed, index);
+
+  if (this.amount) {
+    info["amount"] = duskToLux(this.wasm, info.amount);
+  }
+
+  return info;
+};
+/**
+ * Unstake dusk from the provided psk, refund to the same psk
+ * @param {string} unstaker bs58 encoded psk to unstake from}
+ */
+Wallet.prototype.unstake = async function (unstaker) {
+  const index = this.getPsks().indexOf(unstaker);
+
+  if (!index) {
+    throw new Error("psk not found");
+  }
+
+  return await unstake(this.wasm, this.seed, index, unstaker);
+};
+
+/**
+ * Allow staking dusk from the provided psk, refund to the same psk
+ * @param {string} allowStakePsk bs58 encoded psk to unstake from}
+ */
+Wallet.prototype.stakeAllow = async function (allowStakePsk) {
+  const index = this.getPsks().indexOf(allowStakePsk);
+
+  if (!index) {
+    throw new Error("psk not found");
+  }
+
+  return await stakeAllow(this.wasm, this.seed, index, allowStakePsk);
 };

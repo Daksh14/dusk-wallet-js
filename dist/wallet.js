@@ -5311,8 +5311,8 @@ function stateDB(unspentNotes, spentNotes, pos) {
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,pos,psk,nullifier",
-    spentNotes: "++id,pos,psk,nullifier"
+    unspentNotes: "pos,psk,nullifier",
+    spentNotes: "pos,psk,nullifier"
   });
   try {
     localStorage.setItem("lastPos", pos.toString());
@@ -5382,12 +5382,12 @@ function getAllUnpsentNotes(callback) {
     console.error("Error while getting all unspent notes: " + error);
   });
 }
-function deleteUnspentNotesInsertSpentNotes(unspentNotesIds, spentNotes) {
+function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
   const db = new import_dexie.Dexie("state");
   db.open().then((db2) => {
     const unspentNotesTable = db2.table("unspentNotes");
     if (unspentNotesTable) {
-      unspentNotesTable.bulkDelete(unspentNotesIds);
+      unspentNotesTable.bulkDelete(unspentNotesPos);
     }
     const spentNotesTable = db2.table("spentNotes");
     if (spentNotesTable) {
@@ -5445,7 +5445,6 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   );
   let leaf;
   const notes = [];
-  const block_heights = [];
   const nullifiers = [];
   const psks = [];
   const positions = [];
@@ -5461,7 +5460,6 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
       if (owned.is_owned) {
         lastPos = Math.max(lastPos, pos);
         notes.push(note);
-        block_heights.push(blockHeight);
         positions.push(pos);
         nullifiers.push(owned.nullifier);
         psks.push(owned.public_spend_key);
@@ -5483,6 +5481,7 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
     existingNullifiersBytes,
     psks
   );
+  console.log(allNotes);
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
   if (unspentNotes.length > 0 || spentNotes.length > 0 || // if the last pos we get from the node is bigger than the
@@ -5493,11 +5492,12 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   const unspentNotesNullifiers = [];
   const unspentNotesTemp = [];
   const unspentNotesPsks = [];
-  const unspentNotesIds = [];
-  const correctNotes = async (unspentNotesNullifiers2) => {
+  const unspentNotesPos = [];
+  const correctNotes = async () => {
+    console.log("nullifiers", unspentNotesNullifiers);
     const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
       wasm,
-      unspentNotesNullifiers2
+      unspentNotesNullifiers
     );
     const unpsentNotesExistingNullifiersRemote = await request(
       unspentNotesNullifiersSerialized,
@@ -5511,38 +5511,24 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
     const correctedNotes = unspentSpentNotes(
       wasm,
       unspentNotesTemp,
-      unspentNotesNullifiers2,
+      unspentNotesNullifiers,
       unspentNotesExistingNullifiersBytes,
       unspentNotesPsks
     );
-    const unspentNotesCorrected = Array.from(correctedNotes.unspent_notes).map(
-      (unspentNotedata) => unspentNotedata.note
-    );
-    const idsToRemove = [];
-    unspentNotesTemp.forEach((note, index) => {
-      let needsCorrection = true;
-      unspentNotesCorrected.forEach((correctedNote) => {
-        if (compareNotes(note, correctedNote)) {
-          needsCorrection = false;
-        }
-      });
-      if (needsCorrection) {
-        idsToRemove.push(unspentNotesIds[index]);
-      }
-    });
-    deleteUnspentNotesInsertSpentNotes(
-      idsToRemove,
-      Array.from(correctedNotes.spent_notes)
-    );
+    console.log(correctedNotes);
+    const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
+    const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
+    console.log(posToRemove);
+    deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
   };
   getAllUnpsentNotes(async (allUnspentNotes) => {
     for (const unspentNote of await allUnspentNotes) {
       unspentNotesNullifiers.push(unspentNote.nullifier);
       unspentNotesTemp.push(unspentNote.note);
       unspentNotesPsks.push(unspentNote.psk);
-      unspentNotesIds.push(unspentNote.id);
+      unspentNotesPos.push(unspentNote.pos);
     }
-    correctNotes(unspentNotesNullifiers);
+    correctNotes();
   });
 }
 async function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFER_CONTRACT, targetType = "1") {
@@ -5587,14 +5573,6 @@ function numberToLittleEndianByteArray(num) {
     byteArray[i] = num >> i * 8 & 255;
   }
   return byteArray;
-}
-function compareNotes(noteOne, noteTwo) {
-  let i = noteOne.length;
-  while (i--) {
-    if (noteOne[i] !== noteTwo[i])
-      return false;
-  }
-  return true;
 }
 
 // src/mnemonic.js
@@ -5667,8 +5645,9 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
   getUnpsentNotes(psk, async (notes) => {
     const openings = [];
     const allNotes = [];
+    const psks = [];
+    const nullifiers = [];
     for (const noteData of notes) {
-      console.log(noteData);
       const pos = noteData.pos;
       const fetchedOpening = await fetchOpenings(
         getU64RkyvSerialized(wasm, pos)
@@ -5678,11 +5657,29 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
         openings.push(opening);
       }
       allNotes.push(noteData.note);
+      psks.push(noteData.psk);
+      nullifiers.push(noteData.nullifier);
+      console.log(noteData.pos);
     }
+    const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
+    const existingNullifiersRemote = await request(
+      nullifiersSerialized,
+      "existing_nullifiers",
+      false
+    );
+    const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
+    const existingNullifiersBytes = new Uint8Array(existingNullifiers);
+    const sortedNotes = unspentSpentNotes(
+      wasm,
+      allNotes,
+      nullifiers,
+      existingNullifiersBytes,
+      psks
+    );
+    console.log(sortedNotes);
     const openingsSerialized = Array.from(
       getOpeningsSerialized(wasm, openings)
     );
-    console.log("allNotes:", allNotes);
     const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
     const args = JSON.stringify({
       call: callData,
@@ -5766,6 +5763,9 @@ async function stake(wasm, seed, sender_index, refund, amount) {
   crypto.getRandomValues(rng_seed);
   amount = luxToDusk(wasm, amount);
   const info = await stakeInfo(wasm, seed, sender_index);
+  if (info.has_staked) {
+    throw new Error("Cannot stake if already staked");
+  }
   let counter = 0;
   if (info.counter) {
     counter = info.counter;
@@ -5779,7 +5779,6 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     gas_limit: 29e8,
     gas_price: 1
   });
-  console.log(args);
   const stctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_stct_proof));
   const stctProofBytes = stctProofArgs.bytes;
   const crossover = stctProofArgs.crossover;
@@ -5804,7 +5803,6 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     value: amount,
     counter
   });
-  console.log(callDataArgs);
   const stakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_stake_call_data)
   );
@@ -5855,6 +5853,131 @@ async function stakeInfo(wasm, seed, index) {
   info["epoch"] = epoch;
   return info;
 }
+async function unstake(wasm, seed, sender_index, refund) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+  const info = await stakeInfo(wasm, seed, sender_index);
+  if (!info.has_staked || info.amount === void 0) {
+    throw new Error("Cannot unstake if there's no stake");
+  }
+  let counter = 0;
+  if (info.counter) {
+    counter = info.counter;
+  }
+  const value = info.amount;
+  const args = JSON.stringify({
+    rng_seed: Array.from(rng_seed),
+    seed,
+    refund,
+    value,
+    sender_index,
+    gas_limit: 29e8,
+    gas_price: 1
+  });
+  console.log(args);
+  const wfctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_wfct_proof));
+  console.log(wfctProofArgs);
+  const wfctProofBytes = wfctProofArgs.bytes;
+  const crossover = wfctProofArgs.crossover;
+  const blinder = wfctProofArgs.blinder;
+  const fee = wfctProofArgs.fee;
+  const unstakeNote = wfctProofArgs.unstake_note;
+  const wfctProofReq = await request(
+    wfctProofBytes,
+    "prove_wfct",
+    false,
+    void 0,
+    "rusk",
+    "2"
+  );
+  const bufferWfctProofReq = await wfctProofReq.arrayBuffer();
+  console.log(
+    "wfct proof request response length: " + bufferWfctProofReq.byteLength
+  );
+  const callDataArgs = JSON.stringify({
+    sender_index,
+    seed,
+    unstake_proof: Array.from(new Uint8Array(bufferWfctProofReq)),
+    unstake_note: unstakeNote,
+    counter
+  });
+  console.log(callDataArgs);
+  const unstakeCallData = jsonFromBytes(
+    call(wasm, callDataArgs, wasm.get_unstake_call_data)
+  );
+  console.log(unstakeCallData);
+  const contract = unstakeCallData.contract;
+  const method = unstakeCallData.method;
+  const payload = unstakeCallData.payload;
+  const callData = {
+    contract,
+    method,
+    payload
+  };
+  const crossoverType = {
+    crossover,
+    blinder,
+    value: 0
+  };
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    refund,
+    void 0,
+    callData,
+    crossoverType,
+    fee,
+    29e8,
+    1
+  );
+}
+async function stakeAllow(wasm, seed, sender_index, refund) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+  const info = await stakeInfo(wasm, seed, sender_index);
+  let counter = 0;
+  if (info.counter) {
+    counter = info.counter;
+  }
+  const args = JSON.stringify({
+    rng_seed: Array.from(rng_seed),
+    seed,
+    refund,
+    sender_index,
+    owner_index: sender_index,
+    counter,
+    gas_limit: 29e8,
+    gas_price: 1
+  });
+  console.log(args);
+  const allowCallData = jsonFromBytes(
+    call(wasm, args, wasm.get_allow_call_data)
+  );
+  console.log(allowCallData);
+  const callData = {
+    contract: allowCallData.contract,
+    method: allowCallData.method,
+    payload: allowCallData.payload
+  };
+  const crossoverType = {
+    crossover: allowCallData.crossover,
+    blinder: allowCallData.blinder,
+    value: 0
+  };
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    refund,
+    void 0,
+    callData,
+    crossoverType,
+    allowCallData.fee,
+    29e8,
+    1
+  );
+}
 
 // src/mod.js
 function Wallet(wasmExports, seed) {
@@ -5874,18 +5997,51 @@ Wallet.prototype.transfer = async function(sender, reciever, amount) {
   return await transfer(this.wasm, this.seed, sender, reciever, amount);
 };
 Wallet.prototype.stake = async function(staker, amount) {
+  const minStake = 1e3;
   const index = this.getPsks().indexOf(staker);
+  if (amount < minStake) {
+    throw new Error(`Stake amount needs to be above a ${minStake} dusk`);
+  }
   if (!index) {
     throw new Error("Staker psk not found");
   }
-  return await stake(this.wasm, this.seed, index, staker, amount);
+  const stakeAmount = async () => {
+    return await stake(this.wasm, this.seed, index, staker, amount);
+  };
+  this.getBalance(staker, async (bal) => {
+    if (bal.value < minStake) {
+      throw new Error(
+        `Balance needs to be greater than min stake amount of ${minStake}`
+      );
+    } else {
+      await stakeAmount();
+    }
+  });
 };
 Wallet.prototype.stakeInfo = async function(psk) {
   const index = this.getPsks().indexOf(psk);
   if (!index) {
     throw new Error("Staker psk not found");
   }
-  return await stakeInfo(this.wasm, this.seed, index);
+  const info = await stakeInfo(this.wasm, this.seed, index);
+  if (this.amount) {
+    info["amount"] = duskToLux(this.wasm, info.amount);
+  }
+  return info;
+};
+Wallet.prototype.unstake = async function(unstaker) {
+  const index = this.getPsks().indexOf(unstaker);
+  if (!index) {
+    throw new Error("psk not found");
+  }
+  return await unstake(this.wasm, this.seed, index, unstaker);
+};
+Wallet.prototype.stakeAllow = async function(allowStakePsk) {
+  const index = this.getPsks().indexOf(allowStakePsk);
+  if (!index) {
+    throw new Error("psk not found");
+  }
+  return await stakeAllow(this.wasm, this.seed, index, allowStakePsk);
 };
 export {
   Wallet,

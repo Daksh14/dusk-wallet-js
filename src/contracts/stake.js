@@ -5,7 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { call, jsonFromBytes } from "../wasm.js";
-import { luxToDusk } from "../crypto.js";
+import { luxToDusk, duskToLux } from "../crypto.js";
 import { request } from "../node.js";
 import { execute } from "../execute.js";
 import { getPsks, getPublicKeyRkyvSerialized } from "../keys.js";
@@ -27,6 +27,10 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
 
   const info = await stakeInfo(wasm, seed, sender_index);
 
+  if (info.has_staked) {
+    throw new Error("Cannot stake if already staked");
+  }
+
   let counter = 0;
 
   if (info.counter) {
@@ -42,8 +46,6 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
     gas_limit: 2900000000,
     gas_price: 1,
   });
-
-  console.log(args);
 
   const stctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_stct_proof));
 
@@ -74,8 +76,6 @@ export async function stake(wasm, seed, sender_index, refund, amount) {
     value: amount,
     counter: counter,
   });
-
-  console.log(callDataArgs);
 
   const stakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_stake_call_data)
@@ -144,15 +144,180 @@ export async function stakeInfo(wasm, seed, index) {
 
   let epoch = info.eligiblity / 2160;
 
+  // calculate epoch
   info["epoch"] = epoch;
 
   return info;
 }
 
-async function unstake(wasm, seed, sender_index,) {
-  const pk = 
+/**
+ * Unstake
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} seed
+ * @param {number} sender_index Index of the psk to unstake
+ * @param {string} refund psk to refund this tx to
+ */
+export async function unstake(wasm, seed, sender_index, refund) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+
+  const info = await stakeInfo(wasm, seed, sender_index);
+
+  if (!info.has_staked || info.amount === undefined) {
+    throw new Error("Cannot unstake if there's no stake");
+  }
+
+  let counter = 0;
+
+  if (info.counter) {
+    counter = info.counter;
+  }
+
+  const value = info.amount;
+
+  const args = JSON.stringify({
+    rng_seed: Array.from(rng_seed),
+    seed: seed,
+    refund: refund,
+    value: value,
+    sender_index: sender_index,
+    gas_limit: 2900000000,
+    gas_price: 1,
+  });
+
+  console.log(args);
+
+  const wfctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_wfct_proof));
+  console.log(wfctProofArgs);
+  const wfctProofBytes = wfctProofArgs.bytes;
+  const crossover = wfctProofArgs.crossover;
+  const blinder = wfctProofArgs.blinder;
+  const fee = wfctProofArgs.fee;
+  const unstakeNote = wfctProofArgs.unstake_note;
+
+  const wfctProofReq = await request(
+    wfctProofBytes,
+    "prove_wfct",
+    false,
+    undefined,
+    "rusk",
+    "2"
+  );
+
+  const bufferWfctProofReq = await wfctProofReq.arrayBuffer();
+
+  console.log(
+    "wfct proof request response length: " + bufferWfctProofReq.byteLength
+  );
+
+  const callDataArgs = JSON.stringify({
+    sender_index: sender_index,
+    seed: seed,
+    unstake_proof: Array.from(new Uint8Array(bufferWfctProofReq)),
+    unstake_note: unstakeNote,
+    counter: counter,
+  });
+
+  console.log(callDataArgs);
+
+  const unstakeCallData = jsonFromBytes(
+    call(wasm, callDataArgs, wasm.get_unstake_call_data)
+  );
+
+  console.log(unstakeCallData);
+
+  const contract = unstakeCallData.contract;
+  const method = unstakeCallData.method;
+  const payload = unstakeCallData.payload;
+
+  const callData = {
+    contract: contract,
+    method: method,
+    payload: payload,
+  };
+
+  const crossoverType = {
+    crossover: crossover,
+    blinder: blinder,
+    value: 0,
+  };
+
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    refund,
+    undefined,
+    callData,
+    crossoverType,
+    fee,
+    2900000000,
+    1
+  );
 }
 
-async function stakeAllow() {}
+/**
+ * Allow a staker psk to stake
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} seed
+ * @param {number} sender_index Index of the staker
+ * @param {string} refund Where to refund this transaction to
+ */
+export async function stakeAllow(wasm, seed, sender_index, refund) {
+  const rng_seed = new Uint8Array(32);
+  crypto.getRandomValues(rng_seed);
+
+  const info = await stakeInfo(wasm, seed, sender_index);
+
+  let counter = 0;
+
+  if (info.counter) {
+    counter = info.counter;
+  }
+
+  const args = JSON.stringify({
+    rng_seed: Array.from(rng_seed),
+    seed: seed,
+    refund: refund,
+    sender_index: sender_index,
+    owner_index: sender_index,
+    counter: counter,
+    gas_limit: 2900000000,
+    gas_price: 1,
+  });
+
+  console.log(args);
+
+  const allowCallData = jsonFromBytes(
+    call(wasm, args, wasm.get_allow_call_data)
+  );
+
+  console.log(allowCallData);
+
+  const callData = {
+    contract: allowCallData.contract,
+    method: allowCallData.method,
+    payload: allowCallData.payload,
+  };
+
+  const crossoverType = {
+    crossover: allowCallData.crossover,
+    blinder: allowCallData.blinder,
+    value: 0,
+  };
+
+  execute(
+    wasm,
+    seed,
+    rng_seed,
+    refund,
+    undefined,
+    callData,
+    crossoverType,
+    allowCallData.fee,
+    2900000000,
+    1
+  );
+}
 
 async function withdrawReward() {}

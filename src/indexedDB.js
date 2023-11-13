@@ -18,8 +18,8 @@ export function stateDB(unspentNotes, spentNotes, pos) {
   db.version(1).stores({
     // Added a autoincremented id for good practice
     // if we need to index it in future
-    unspentNotes: "++id,pos,psk,nullifier",
-    spentNotes: "++id,pos,psk,nullifier",
+    unspentNotes: "pos,psk,nullifier",
+    spentNotes: "pos,psk,nullifier",
   });
 
   try {
@@ -150,12 +150,12 @@ export function getAllUnpsentNotes(callback) {
     });
 }
 
-/**  Delete unspent notes given their ids and insert spent notes given data
-/* @param {Array<number>} unspentNotesIds - ids of the unspent notes to delete
+/**  Delete unspent notes given their Pos and insert spent notes given data
+/* @param {Array<number>} unspentNotesPos - ids of the unspent notes to delete
 /* @param {Array<object>} spentNotes - spent notes to insert
 */
 export function deleteUnspentNotesInsertSpentNotes(
-  unspentNotesIds,
+  unspentNotesPos,
   spentNotes
 ) {
   const db = new Dexie("state");
@@ -164,7 +164,7 @@ export function deleteUnspentNotesInsertSpentNotes(
     .then((db) => {
       const unspentNotesTable = db.table("unspentNotes");
       if (unspentNotesTable) {
-        unspentNotesTable.bulkDelete(unspentNotesIds);
+        unspentNotesTable.bulkDelete(unspentNotesPos);
       }
 
       const spentNotesTable = db.table("spentNotes");

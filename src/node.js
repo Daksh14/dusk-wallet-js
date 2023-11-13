@@ -53,7 +53,6 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   let leaf;
   // The notes we get from the network which we own.
   const notes = [];
-  const block_heights = [];
   const nullifiers = [];
   const psks = [];
   const positions = [];
@@ -75,7 +74,6 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
         lastPos = Math.max(lastPos, pos);
 
         notes.push(note);
-        block_heights.push(blockHeight);
         positions.push(pos);
         nullifiers.push(owned.nullifier);
         psks.push(owned.public_spend_key);
@@ -104,6 +102,8 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     psks
   );
 
+  console.log(allNotes);
+
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
@@ -122,9 +122,11 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const unspentNotesNullifiers = [];
   const unspentNotesTemp = [];
   const unspentNotesPsks = [];
-  const unspentNotesIds = [];
+  const unspentNotesPos = [];
 
-  const correctNotes = async (unspentNotesNullifiers) => {
+  const correctNotes = async () => {
+    console.log("nullifiers", unspentNotesNullifiers);
+    // get the nullifiers
     const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
       wasm,
       unspentNotesNullifiers
@@ -143,7 +145,9 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     const unspentNotesExistingNullifiersBytes = new Uint8Array(
       unspentNotesExistingNullifiers
     );
-
+    // calculate the unspent and spent notes
+    // from all the unspent note in the db
+    // their nullifiers
     const correctedNotes = unspentSpentNotes(
       wasm,
       unspentNotesTemp,
@@ -152,40 +156,26 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       unspentNotesPsks
     );
 
-    const unspentNotesCorrected = Array.from(correctedNotes.unspent_notes).map(
-      (unspentNotedata) => unspentNotedata.note
-    );
+    console.log(correctedNotes);
 
-    const idsToRemove = [];
+    // These are the spent notes which were unspent before
+    const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
+    const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
 
-    unspentNotesTemp.forEach((note, index) => {
-      let needsCorrection = true;
-      unspentNotesCorrected.forEach((correctedNote) => {
-        if (compareNotes(note, correctedNote)) {
-          needsCorrection = false;
-        }
-      });
+    console.log(posToRemove);
 
-      if (needsCorrection) {
-        idsToRemove.push(unspentNotesIds[index]);
-      }
-    });
-
-    deleteUnspentNotesInsertSpentNotes(
-      idsToRemove,
-      Array.from(correctedNotes.spent_notes)
-    );
+    deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
   };
-
+  // grab all the unspent notes and put the data of those unspent notes in arrays
   getAllUnpsentNotes(async (allUnspentNotes) => {
     for (const unspentNote of await allUnspentNotes) {
       unspentNotesNullifiers.push(unspentNote.nullifier);
       unspentNotesTemp.push(unspentNote.note);
       unspentNotesPsks.push(unspentNote.psk);
-      unspentNotesIds.push(unspentNote.id);
+      unspentNotesPos.push(unspentNote.pos);
     }
-
-    correctNotes(unspentNotesNullifiers);
+    // start the correction of the notes
+    correctNotes();
   });
 }
 /**
@@ -273,7 +263,7 @@ function numberToLittleEndianByteArray(num) {
 }
 
 /**
- * Compare notes and return true or false
+ * Compare notes or nullifiers and return true or false
  * @param {Uint8Array} noteOne
  * @param {Uint8Array} noteTwo
  * @returns {boolean} true if the notes are equal, false otherwise
