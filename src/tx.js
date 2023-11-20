@@ -14,7 +14,7 @@ import { call, jsonFromBytes } from "./wasm.js";
  */
 export function getUnprovenTxVarBytes(wasm, unprovenTx) {
   const args = JSON.stringify({
-    bytes: unprovenTx,
+    bytes: Array.from(unprovenTx),
   });
 
   const result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
@@ -30,7 +30,7 @@ export function getUnprovenTxVarBytes(wasm, unprovenTx) {
  */
 export function proveTx(wasm, unprovenTx, proof) {
   const args = JSON.stringify({
-    unproven_tx: unprovenTx,
+    unproven_tx: Array.from(unprovenTx),
     proof: Array.from(proof),
   });
 

@@ -30,7 +30,7 @@ function alloc(wasm, bytes) {
  */
 function getAndFree(wasm, result) {
   try {
-    var mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
+    const mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
 
     wasm.free_mem(result.ptr, result.length);
     return mem;
@@ -76,7 +76,7 @@ export function jsonFromBytes(bytes) {
     const jsonParsed = JSON.parse(string);
     return jsonParsed;
   } catch (e) {
-    throw new Error("Error while parsing json output from function");
+    throw new Error("Error while parsing json output from function:", e);
   }
 }
 /**
@@ -93,8 +93,6 @@ export function call(wasm, args, function_call) {
   const ptr = alloc(wasm, argBytes);
   const call = function_call(ptr, argBytes.byteLength);
   const callResult = decompose(call);
-
-  console.log(callResult);
 
   if (!callResult.status) {
     console.error("Function call " + function_call + " failed!");

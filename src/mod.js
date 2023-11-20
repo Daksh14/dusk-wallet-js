@@ -126,15 +126,22 @@ Wallet.prototype.unstake = async function (unstaker) {
 };
 
 /**
- * Allow staking dusk from the provided psk, refund to the same psk
- * @param {string} allowStakePsk bs58 encoded psk to unstake from}
+ * Allow staking dusk from the provided psk
+ * @param {string} allowStakePsk psk to allow staking from
+ * @param {string} senderPsk the psk of the sender, if undefined then index 0 (default index) is used
  */
-Wallet.prototype.stakeAllow = async function (allowStakePsk) {
-  const index = this.getPsks().indexOf(allowStakePsk);
+Wallet.prototype.stakeAllow = async function (allowStakePsk, senderPsk) {
+  const psks = this.getPsks();
+  const staker = psks.indexOf(allowStakePsk);
+  let sender = psks.indexOf(senderPsk);
 
-  if (!index) {
-    throw new Error("psk not found");
+  if (staker === -1) {
+    throw new Error("staker psk not found");
   }
 
-  return await stakeAllow(this.wasm, this.seed, index, allowStakePsk);
+  if (sender === -1) {
+    return await stakeAllow(this.wasm, this.seed, staker);
+  } else {
+    return await stakeAllow(this.wasm, this.seed, staker, sender);
+  }
 };

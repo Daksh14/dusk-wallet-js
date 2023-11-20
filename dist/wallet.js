@@ -5221,7 +5221,7 @@ function alloc(wasm, bytes) {
 }
 function getAndFree(wasm, result) {
   try {
-    var mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
+    const mem = new Uint8Array(wasm.memory.buffer, result.ptr, result.length);
     wasm.free_mem(result.ptr, result.length);
     return mem;
   } catch (e) {
@@ -5249,7 +5249,7 @@ function jsonFromBytes(bytes) {
     const jsonParsed = JSON.parse(string);
     return jsonParsed;
   } catch (e) {
-    throw new Error("Error while parsing json output from function");
+    throw new Error("Error while parsing json output from function:", e);
   }
 }
 function call(wasm, args, function_call) {
@@ -5257,7 +5257,6 @@ function call(wasm, args, function_call) {
   const ptr = alloc(wasm, argBytes);
   const call2 = function_call(ptr, argBytes.byteLength);
   const callResult = decompose(call2);
-  console.log(callResult);
   if (!callResult.status) {
     console.error("Function call " + function_call + " failed!");
   }
@@ -5626,14 +5625,14 @@ function getBalance(wasm, seed, psk, callback) {
 // src/tx.js
 function getUnprovenTxVarBytes(wasm, unprovenTx) {
   const args = JSON.stringify({
-    bytes: unprovenTx
+    bytes: Array.from(unprovenTx)
   });
   const result = jsonFromBytes(call(wasm, args, wasm.unproven_tx_to_bytes));
   return result.serialized;
 }
 function proveTx(wasm, unprovenTx, proof) {
   const args = JSON.stringify({
-    unproven_tx: unprovenTx,
+    unproven_tx: Array.from(unprovenTx),
     proof: Array.from(proof)
   });
   const result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
@@ -5642,9 +5641,10 @@ function proveTx(wasm, unprovenTx, proof) {
 
 // src/execute.js
 function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, gas_limit, gas_price) {
+  const sender_index = getPsks(wasm, seed).indexOf(psk);
   getUnpsentNotes(psk, async (notes) => {
     const openings = [];
-    const allNotes = [];
+    let allNotes = [];
     const psks = [];
     const nullifiers = [];
     for (const noteData of notes) {
@@ -5654,33 +5654,21 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
       );
       const opening = Array.from(fetchedOpening);
       if (opening.length > 0) {
-        openings.push(opening);
+        openings.push({
+          opening,
+          pos
+        });
       }
       allNotes.push(noteData.note);
       psks.push(noteData.psk);
       nullifiers.push(noteData.nullifier);
       console.log(noteData.pos);
     }
-    const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
-    const existingNullifiersRemote = await request(
-      nullifiersSerialized,
-      "existing_nullifiers",
-      false
-    );
-    const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
-    const existingNullifiersBytes = new Uint8Array(existingNullifiers);
-    const sortedNotes = unspentSpentNotes(
-      wasm,
-      allNotes,
-      nullifiers,
-      existingNullifiersBytes,
-      psks
-    );
-    console.log(sortedNotes);
     const openingsSerialized = Array.from(
       getOpeningsSerialized(wasm, openings)
     );
     const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
+    console.log(inputs);
     const args = JSON.stringify({
       call: callData,
       crossover,
@@ -5691,6 +5679,7 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
       refund: psk,
       output,
       openings: openingsSerialized,
+      sender_index,
       gas_limit,
       gas_price
     });
@@ -5932,11 +5921,15 @@ async function unstake(wasm, seed, sender_index, refund) {
     1
   );
 }
-async function stakeAllow(wasm, seed, sender_index, refund) {
+async function stakeAllow(wasm, seed, staker_index, sender_index = 0) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
-  const info = await stakeInfo(wasm, seed, sender_index);
+  const info = await stakeInfo(wasm, seed, staker_index);
+  const refund = getPsks(wasm, seed)[sender_index];
   let counter = 0;
+  if (info.has_staked) {
+    throw new Error("staker_index already has existing stake");
+  }
   if (info.counter) {
     counter = info.counter;
   }
@@ -5944,7 +5937,7 @@ async function stakeAllow(wasm, seed, sender_index, refund) {
     rng_seed: Array.from(rng_seed),
     seed,
     refund,
-    sender_index,
+    sender_index: staker_index,
     owner_index: sender_index,
     counter,
     gas_limit: 29e8,
@@ -6036,12 +6029,18 @@ Wallet.prototype.unstake = async function(unstaker) {
   }
   return await unstake(this.wasm, this.seed, index, unstaker);
 };
-Wallet.prototype.stakeAllow = async function(allowStakePsk) {
-  const index = this.getPsks().indexOf(allowStakePsk);
-  if (!index) {
-    throw new Error("psk not found");
+Wallet.prototype.stakeAllow = async function(allowStakePsk, senderPsk) {
+  const psks = this.getPsks();
+  const staker = psks.indexOf(allowStakePsk);
+  let sender = psks.indexOf(senderPsk);
+  if (staker === -1) {
+    throw new Error("staker psk not found");
   }
-  return await stakeAllow(this.wasm, this.seed, index, allowStakePsk);
+  if (sender === -1) {
+    return await stakeAllow(this.wasm, this.seed, staker);
+  } else {
+    return await stakeAllow(this.wasm, this.seed, staker, sender);
+  }
 };
 export {
   Wallet,

@@ -14,6 +14,7 @@ import {
 } from "./rkyv.js";
 import { unspentSpentNotes } from "./crypto.js";
 import { call, jsonFromBytes } from "./wasm.js";
+import { getPsks } from "./keys.js";
 import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 
 /**
@@ -41,9 +42,11 @@ export function execute(
   gas_limit,
   gas_price
 ) {
+  const sender_index = getPsks(wasm, seed).indexOf(psk);
+
   getUnpsentNotes(psk, async (notes) => {
     const openings = [];
-    const allNotes = [];
+    let allNotes = [];
     const psks = [];
     const nullifiers = [];
 
@@ -56,38 +59,16 @@ export function execute(
       const opening = Array.from(fetchedOpening);
 
       if (opening.length > 0) {
-        openings.push(opening);
+        openings.push({
+          opening: opening,
+          pos: pos,
+        });
       }
 
       allNotes.push(noteData.note);
       psks.push(noteData.psk);
       nullifiers.push(noteData.nullifier);
-
-      console.log(noteData.pos);
     }
-
-    const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
-
-    // Fetch existing nullifiers from the node
-    const existingNullifiersRemote = await request(
-      nullifiersSerialized,
-      "existing_nullifiers",
-      false
-    );
-
-    const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
-
-    const existingNullifiersBytes = new Uint8Array(existingNullifiers);
-
-    const sortedNotes = unspentSpentNotes(
-      wasm,
-      allNotes,
-      nullifiers,
-      existingNullifiersBytes,
-      psks
-    );
-
-    console.log(sortedNotes);
 
     const openingsSerialized = Array.from(
       getOpeningsSerialized(wasm, openings)
@@ -105,11 +86,10 @@ export function execute(
       refund: psk,
       output: output,
       openings: openingsSerialized,
+      sender_index: sender_index,
       gas_limit: gas_limit,
       gas_price: gas_price,
     });
-
-    console.log(args);
 
     const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
 
@@ -129,7 +109,7 @@ export function execute(
 
     const buffer = await proofReq.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-
+    // prove and propogate tx
     const tx = proveTx(wasm, unprovenTx, bytes);
 
     const preVerifyReq = await request(

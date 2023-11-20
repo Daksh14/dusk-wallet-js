@@ -102,8 +102,6 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     psks
   );
 
-  console.log(allNotes);
-
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
@@ -156,13 +154,9 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       unspentNotesPsks
     );
 
-    console.log(correctedNotes);
-
     // These are the spent notes which were unspent before
     const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
     const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
-
-    console.log(posToRemove);
 
     deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
   };
@@ -247,6 +241,7 @@ export async function fetchOpenings(pos, node = LOCAL_NODE) {
     console.log("Fetching Openings failed: " + e);
   }
 }
+
 /**
  * Seerialize a number to a little endian byte array
  * @param {number} number to serialize
@@ -260,20 +255,4 @@ function numberToLittleEndianByteArray(num) {
   }
 
   return byteArray;
-}
-
-/**
- * Compare notes or nullifiers and return true or false
- * @param {Uint8Array} noteOne
- * @param {Uint8Array} noteTwo
- * @returns {boolean} true if the notes are equal, false otherwise
- */
-function compareNotes(noteOne, noteTwo) {
-  let i = noteOne.length;
-
-  while (i--) {
-    if (noteOne[i] !== noteTwo[i]) return false;
-  }
-
-  return true;
 }

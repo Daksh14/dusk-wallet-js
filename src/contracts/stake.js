@@ -185,10 +185,7 @@ export async function unstake(wasm, seed, sender_index, refund) {
     gas_price: 1,
   });
 
-  console.log(args);
-
   const wfctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_wfct_proof));
-  console.log(wfctProofArgs);
   const wfctProofBytes = wfctProofArgs.bytes;
   const crossover = wfctProofArgs.crossover;
   const blinder = wfctProofArgs.blinder;
@@ -218,13 +215,9 @@ export async function unstake(wasm, seed, sender_index, refund) {
     counter: counter,
   });
 
-  console.log(callDataArgs);
-
   const unstakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_unstake_call_data)
   );
-
-  console.log(unstakeCallData);
 
   const contract = unstakeCallData.contract;
   const method = unstakeCallData.method;
@@ -260,16 +253,22 @@ export async function unstake(wasm, seed, sender_index, refund) {
  * Allow a staker psk to stake
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed
- * @param {number} sender_index Index of the staker
- * @param {string} refund Where to refund this transaction to
+ * @param {number} staker_index Index of the staker
+ * @param {number} sender_index Index of the sender, if undefined we use the default one
  */
-export async function stakeAllow(wasm, seed, sender_index, refund) {
+export async function stakeAllow(wasm, seed, staker_index, sender_index = 0) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
 
-  const info = await stakeInfo(wasm, seed, sender_index);
+  const info = await stakeInfo(wasm, seed, staker_index);
+
+  const refund = getPsks(wasm, seed)[sender_index];
 
   let counter = 0;
+
+  if (info.has_staked) {
+    throw new Error("staker_index already has existing stake");
+  }
 
   if (info.counter) {
     counter = info.counter;
@@ -279,20 +278,16 @@ export async function stakeAllow(wasm, seed, sender_index, refund) {
     rng_seed: Array.from(rng_seed),
     seed: seed,
     refund: refund,
-    sender_index: sender_index,
+    sender_index: staker_index,
     owner_index: sender_index,
     counter: counter,
     gas_limit: 2900000000,
     gas_price: 1,
   });
 
-  console.log(args);
-
   const allowCallData = jsonFromBytes(
     call(wasm, args, wasm.get_allow_call_data)
   );
-
-  console.log(allowCallData);
 
   const callData = {
     contract: allowCallData.contract,

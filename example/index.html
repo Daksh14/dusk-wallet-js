@@ -6,37 +6,65 @@
     <div><p>Well this is awkward</p></div>
     <script type="module">
       import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
+      // Default wallet seed
+      const seed = [
+        153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115,
+        19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168,
+        214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55,
+        172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117,
+        221, 221,
+      ];
+
+      let memory;
+
+      const imports = {
+        env: {
+          log_string(ptr, len) {
+            console.log(readString(ptr, len));
+          },
+        },
+      };
+
+      function readString(ptr, len) {
+        const view = new Uint8Array(memory.buffer);
+
+        const buf = new Uint8Array(view.subarray(ptr, ptr + len));
+        return new TextDecoder().decode(buf);
+      }
+
       const initWasm = async () => {
-        const { instance } = await WebAssembly.instantiateStreaming(
-          fetch("../assets/dusk-wallet-core-0.21.0.wasm")
-        );
+        fetch("../assets/dusk-wallet-core-0.21.0.wasm")
+          .then((response) => response.arrayBuffer())
+          .then((buffer) => WebAssembly.instantiate(buffer, imports))
+          .then(async (result) => {
+            console.log("wasm loaded!: ", result);
+            const exports = result.instance.exports;
+            memory = exports.memory;
 
-        let wasm = instance.exports;
+            let wallet = new Wallet(exports, seed);
 
-        let seed = [
-          153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10,
-          115, 19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90,
-          145, 168, 214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34,
-          113, 55, 172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196,
-          252, 117, 221, 221,
-        ];
-        let wallet = new Wallet(wasm, seed);
-        let sync = await wallet.sync();
-        let psks = wallet.getPsks();
+            let sync = await wallet.sync();
+            let psks = wallet.getPsks();
 
-        wallet.getBalance(psks[0], (bal) => {
-          console.log(bal.value);
-        });
+            wallet.getBalance(psks[0], (bal) => {
+              console.log(bal.value);
+            });
 
-        wallet.getBalance(psks[1], (bal) => {
-          console.log(bal.value);
-        });
+            wallet.getBalance(psks[2], (bal) => {
+              console.log(bal.value);
+            });
 
-        // wallet.transfer(psks[0], psks[1], 4000);
-        // wallet.stake(psks[1], 2000);
-        // console.log(await wallet.stakeInfo(psks[1]));
-        // wallet.unstake(psks[1]);
-        // wallet.stakeAllow(psks[2]);
+            // wallet.transfer(psks[0], psks[2], 4000);
+            // wallet.stake(psks[2], 2000);
+            // console.log(await wallet.stakeInfo(psks[2]));
+            // wallet.unstake(psks[2]);
+            //   wallet.stakeAllow(psks[2]);
+          })
+          .catch((err) =>
+            setTimeout(() => {
+              throw err;
+            })
+          );
       };
 
       document.addEventListener("DOMContentLoaded", function (event) {
