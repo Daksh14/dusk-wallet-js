@@ -4,13 +4,13 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { sync } from "./node.js";
+import { sync, stakeInfo } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import { getPsks } from "./keys.js";
 import { duskToLux } from "./crypto.js";
 import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
-import { stake, stakeInfo, unstake, stakeAllow } from "./contracts/stake.js";
+import { stake, unstake, stakeAllow } from "./contracts/stake.js";
 
 // Export mnemnoic functions
 export { generateRandomMnemonic, getSeedFromMnemonic };
@@ -21,10 +21,14 @@ export { generateRandomMnemonic, getSeedFromMnemonic };
  * @param {WebAssembly.Exports} wasmExports The exports of the wallet-core wasm
  * binary https://github.com/dusk-network/wallet-core
  * @param {Uint8Array} seed The seed of the wallet
+ * @param {number} gasLimit The gas limit of the wallet, default is 2900000000
+ * @param {number} gasPrice The gas price of the wallet, default is 1
  */
-export function Wallet(wasmExports, seed) {
+export function Wallet(wasmExports, seed, gasLimit = 2900000000, gasPrice = 1) {
   this.wasm = wasmExports;
   this.seed = seed;
+  this.gasLimit = gasLimit;
+  this.gasPrice = gasPrice;
 }
 
 /**
@@ -58,7 +62,15 @@ Wallet.prototype.sync = async function () {
  *
  */
 Wallet.prototype.transfer = async function (sender, reciever, amount) {
-  return await transfer(this.wasm, this.seed, sender, reciever, amount);
+  return await transfer(
+    this.wasm,
+    this.seed,
+    sender,
+    reciever,
+    amount,
+    this.gasLimit,
+    this.gasPrice
+  );
 };
 /**
  * Stake Dusk from the provided psk, refund to the same psk
@@ -78,7 +90,15 @@ Wallet.prototype.stake = async function (staker, amount) {
   }
 
   const stakeAmount = async () => {
-    return await stake(this.wasm, this.seed, index, staker, amount);
+    return await stake(
+      this.wasm,
+      this.seed,
+      index,
+      staker,
+      amount,
+      this.gasLimit,
+      this.gasPrice
+    );
   };
 
   this.getBalance(staker, async (bal) => {
@@ -99,7 +119,7 @@ Wallet.prototype.stake = async function (staker, amount) {
 Wallet.prototype.stakeInfo = async function (psk) {
   const index = this.getPsks().indexOf(psk);
 
-  if (!index) {
+  if (index < 0) {
     throw new Error("Staker psk not found");
   }
 
@@ -122,7 +142,14 @@ Wallet.prototype.unstake = async function (unstaker) {
     throw new Error("psk not found");
   }
 
-  return await unstake(this.wasm, this.seed, index, unstaker);
+  return await unstake(
+    this.wasm,
+    this.seed,
+    index,
+    unstaker,
+    this.gasLimit,
+    this.gasPrice
+  );
 };
 
 /**
@@ -140,8 +167,22 @@ Wallet.prototype.stakeAllow = async function (allowStakePsk, senderPsk) {
   }
 
   if (sender === -1) {
-    return await stakeAllow(this.wasm, this.seed, staker);
+    return await stakeAllow(
+      this.wasm,
+      this.seed,
+      staker,
+      0,
+      this.gasLimit,
+      this.gasPrice
+    );
   } else {
-    return await stakeAllow(this.wasm, this.seed, staker, sender);
+    return await stakeAllow(
+      this.wasm,
+      this.seed,
+      staker,
+      sender,
+      this.gasLimit,
+      this.gasPrice
+    );
   }
 };

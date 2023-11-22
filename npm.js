@@ -5,13 +5,11 @@ await emptyDir("./npm");
 await build({
   entryPoints: ["./src/mod.js"],
   outDir: "./npm",
-  shims: {
-    // see JS docs for overview and more options
-    deno: true,
-  },
+  shims: [],
+  testShims: [],
   package: {
     // package.json properties
-    name: "dusk-wallet-js",
+    name: "@dusk-network/dusk-wallet-js",
     version: Deno.args[0],
     description: "JS library for interacting with the dusk network",
     license: "MPL",

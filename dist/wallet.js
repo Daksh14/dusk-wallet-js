@@ -5301,6 +5301,21 @@ function getOpeningsSerialized(wasm, bytes) {
   return result;
 }
 
+// src/keys.js
+function getPsks(wasm, seed) {
+  const json = JSON.stringify({
+    seed: Array.from(seed)
+  });
+  return jsonFromBytes(call(wasm, json, wasm.public_spend_keys)).keys;
+}
+function getPublicKeyRkyvSerialized(wasm, seed, index) {
+  const json = JSON.stringify({
+    seed: Array.from(seed),
+    index
+  });
+  return call(wasm, json, wasm.get_public_key_rkyv_serialized);
+}
+
 // deps.js
 var import_dexie = __toESM(require_dexie());
 
@@ -5480,7 +5495,6 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
     existingNullifiersBytes,
     psks
   );
-  console.log(allNotes);
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
   if (unspentNotes.length > 0 || spentNotes.length > 0 || // if the last pos we get from the node is bigger than the
@@ -5514,10 +5528,8 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
       unspentNotesExistingNullifiersBytes,
       unspentNotesPsks
     );
-    console.log(correctedNotes);
     const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
     const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
-    console.log(posToRemove);
     deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
   };
   getAllUnpsentNotes(async (allUnspentNotes) => {
@@ -5566,6 +5578,27 @@ async function fetchOpenings(pos, node = LOCAL_NODE) {
     console.log("Fetching Openings failed: " + e);
   }
 }
+async function stakeInfo(wasm, seed, index) {
+  const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
+  console.log("Fetching stake info");
+  const stakeInfoRequest = await request(
+    pk,
+    "get_stake",
+    false,
+    void 0,
+    "0200000000000000000000000000000000000000000000000000000000000000",
+    "1"
+  );
+  const stakeInfoRequestBuffer = await stakeInfoRequest.arrayBuffer();
+  const stakeInfoRequestBytes = new Uint8Array(stakeInfoRequestBuffer);
+  const args = JSON.stringify({
+    stake_info: Array.from(stakeInfoRequestBytes)
+  });
+  const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
+  let epoch = info.eligiblity / 2160;
+  info["epoch"] = epoch;
+  return info;
+}
 function numberToLittleEndianByteArray(num) {
   const byteArray = new Uint8Array(4);
   for (let i = 0; i < 4; i++) {
@@ -5589,21 +5622,6 @@ function getSeedFromMnemonic(wasm, mnemonic, passphrase) {
     passphrase
   });
   return jsonFromBytes(call(wasm, json, wasm.get_mnemonic_seed)).mnemonic_seed;
-}
-
-// src/keys.js
-function getPsks(wasm, seed) {
-  const json = JSON.stringify({
-    seed: Array.from(seed)
-  });
-  return jsonFromBytes(call(wasm, json, wasm.public_spend_keys)).keys;
-}
-function getPublicKeyRkyvSerialized(wasm, seed, index) {
-  const json = JSON.stringify({
-    seed: Array.from(seed),
-    index
-  });
-  return call(wasm, json, wasm.get_public_key_rkyv_serialized);
 }
 
 // src/balance.js
@@ -5662,13 +5680,11 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
       allNotes.push(noteData.note);
       psks.push(noteData.psk);
       nullifiers.push(noteData.nullifier);
-      console.log(noteData.pos);
     }
     const openingsSerialized = Array.from(
       getOpeningsSerialized(wasm, openings)
     );
     const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
-    console.log(inputs);
     const args = JSON.stringify({
       call: callData,
       crossover,
@@ -5683,7 +5699,6 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
       gas_limit,
       gas_price
     });
-    console.log(args);
     const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
     console.log("unrpovenTx length: " + unprovenTx.length);
     const varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
@@ -5721,7 +5736,7 @@ function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, ga
 }
 
 // src/contracts/transfer.js
-function transfer(wasm, seed, sender, receiver, amount) {
+function transfer(wasm, seed, sender, receiver, amount, gasLimit, gasPrice) {
   amount = luxToDusk(wasm, amount);
   const output = {
     receiver,
@@ -5741,19 +5756,22 @@ function transfer(wasm, seed, sender, receiver, amount) {
     void 0,
     void 0,
     void 0,
-    5e8,
-    1
+    gasLimit,
+    gasPrice
   );
 }
 
 // src/contracts/stake.js
-async function stake(wasm, seed, sender_index, refund, amount) {
+async function stake(wasm, seed, senderIndex, refund, amount, gasLimit, gasPrice) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
   amount = luxToDusk(wasm, amount);
-  const info = await stakeInfo(wasm, seed, sender_index);
+  const info = await stakeInfo(wasm, seed, senderIndex);
   if (info.has_staked) {
     throw new Error("Cannot stake if already staked");
+  }
+  if (!info.has_key) {
+    throw new Error("No stake exists for this key");
   }
   let counter = 0;
   if (info.counter) {
@@ -5764,9 +5782,9 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     seed,
     refund,
     value: amount,
-    sender_index,
-    gas_limit: 29e8,
-    gas_price: 1
+    sender_index: senderIndex,
+    gas_limit: gasLimit,
+    gas_price: gasPrice
   });
   const stctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_stct_proof));
   const stctProofBytes = stctProofArgs.bytes;
@@ -5786,7 +5804,7 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     "stct proof request response length: " + bufferStctProofReq.byteLength
   );
   const callDataArgs = JSON.stringify({
-    staker_index: sender_index,
+    staker_index: senderIndex,
     seed,
     spend_proof: Array.from(new Uint8Array(bufferStctProofReq)),
     value: amount,
@@ -5817,32 +5835,11 @@ async function stake(wasm, seed, sender_index, refund, amount) {
     callData,
     crossoverType,
     fee,
-    29e8,
-    1
+    gasLimit,
+    gasPrice
   );
 }
-async function stakeInfo(wasm, seed, index) {
-  const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
-  console.log("Fetching stake info");
-  const stakeInfoRequest = await request(
-    pk,
-    "get_stake",
-    false,
-    void 0,
-    "0200000000000000000000000000000000000000000000000000000000000000",
-    "1"
-  );
-  const stakeInfoRequestBuffer = await stakeInfoRequest.arrayBuffer();
-  const stakeInfoRequestBytes = new Uint8Array(stakeInfoRequestBuffer);
-  const args = JSON.stringify({
-    stake_info: Array.from(stakeInfoRequestBytes)
-  });
-  const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
-  let epoch = info.eligiblity / 2160;
-  info["epoch"] = epoch;
-  return info;
-}
-async function unstake(wasm, seed, sender_index, refund) {
+async function unstake(wasm, seed, sender_index, refund, gasLimit, gasPrice) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
   const info = await stakeInfo(wasm, seed, sender_index);
@@ -5860,12 +5857,10 @@ async function unstake(wasm, seed, sender_index, refund) {
     refund,
     value,
     sender_index,
-    gas_limit: 29e8,
-    gas_price: 1
+    gas_limit: gasLimit,
+    gas_price: gasPrice
   });
-  console.log(args);
   const wfctProofArgs = jsonFromBytes(call(wasm, args, wasm.get_wfct_proof));
-  console.log(wfctProofArgs);
   const wfctProofBytes = wfctProofArgs.bytes;
   const crossover = wfctProofArgs.crossover;
   const blinder = wfctProofArgs.blinder;
@@ -5890,11 +5885,9 @@ async function unstake(wasm, seed, sender_index, refund) {
     unstake_note: unstakeNote,
     counter
   });
-  console.log(callDataArgs);
   const unstakeCallData = jsonFromBytes(
     call(wasm, callDataArgs, wasm.get_unstake_call_data)
   );
-  console.log(unstakeCallData);
   const contract = unstakeCallData.contract;
   const method = unstakeCallData.method;
   const payload = unstakeCallData.payload;
@@ -5917,11 +5910,11 @@ async function unstake(wasm, seed, sender_index, refund) {
     callData,
     crossoverType,
     fee,
-    29e8,
-    1
+    gasLimit,
+    gasPrice
   );
 }
-async function stakeAllow(wasm, seed, staker_index, sender_index = 0) {
+async function stakeAllow(wasm, seed, staker_index, sender_index = 0, gasLimit, gasPrice) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
   const info = await stakeInfo(wasm, seed, staker_index);
@@ -5940,14 +5933,12 @@ async function stakeAllow(wasm, seed, staker_index, sender_index = 0) {
     sender_index: staker_index,
     owner_index: sender_index,
     counter,
-    gas_limit: 29e8,
-    gas_price: 1
+    gas_limit: gasLimit,
+    gas_price: gasPrice
   });
-  console.log(args);
   const allowCallData = jsonFromBytes(
     call(wasm, args, wasm.get_allow_call_data)
   );
-  console.log(allowCallData);
   const callData = {
     contract: allowCallData.contract,
     method: allowCallData.method,
@@ -5967,15 +5958,17 @@ async function stakeAllow(wasm, seed, staker_index, sender_index = 0) {
     callData,
     crossoverType,
     allowCallData.fee,
-    29e8,
-    1
+    gasLimit,
+    gasPrice
   );
 }
 
 // src/mod.js
-function Wallet(wasmExports, seed) {
+function Wallet(wasmExports, seed, gasLimit = 29e8, gasPrice = 1) {
   this.wasm = wasmExports;
   this.seed = seed;
+  this.gasLimit = gasLimit;
+  this.gasPrice = gasPrice;
 }
 Wallet.prototype.getBalance = function(psk, callback) {
   getBalance(this.wasm, this.seed, psk, callback);
@@ -5987,7 +5980,15 @@ Wallet.prototype.sync = async function() {
   return await sync(this.wasm, this.seed);
 };
 Wallet.prototype.transfer = async function(sender, reciever, amount) {
-  return await transfer(this.wasm, this.seed, sender, reciever, amount);
+  return await transfer(
+    this.wasm,
+    this.seed,
+    sender,
+    reciever,
+    amount,
+    this.gasLimit,
+    this.gasPrice
+  );
 };
 Wallet.prototype.stake = async function(staker, amount) {
   const minStake = 1e3;
@@ -5999,7 +6000,15 @@ Wallet.prototype.stake = async function(staker, amount) {
     throw new Error("Staker psk not found");
   }
   const stakeAmount = async () => {
-    return await stake(this.wasm, this.seed, index, staker, amount);
+    return await stake(
+      this.wasm,
+      this.seed,
+      index,
+      staker,
+      amount,
+      this.gasLimit,
+      this.gasPrice
+    );
   };
   this.getBalance(staker, async (bal) => {
     if (bal.value < minStake) {
@@ -6013,7 +6022,7 @@ Wallet.prototype.stake = async function(staker, amount) {
 };
 Wallet.prototype.stakeInfo = async function(psk) {
   const index = this.getPsks().indexOf(psk);
-  if (!index) {
+  if (index < 0) {
     throw new Error("Staker psk not found");
   }
   const info = await stakeInfo(this.wasm, this.seed, index);
@@ -6027,7 +6036,14 @@ Wallet.prototype.unstake = async function(unstaker) {
   if (!index) {
     throw new Error("psk not found");
   }
-  return await unstake(this.wasm, this.seed, index, unstaker);
+  return await unstake(
+    this.wasm,
+    this.seed,
+    index,
+    unstaker,
+    this.gasLimit,
+    this.gasPrice
+  );
 };
 Wallet.prototype.stakeAllow = async function(allowStakePsk, senderPsk) {
   const psks = this.getPsks();
@@ -6037,9 +6053,23 @@ Wallet.prototype.stakeAllow = async function(allowStakePsk, senderPsk) {
     throw new Error("staker psk not found");
   }
   if (sender === -1) {
-    return await stakeAllow(this.wasm, this.seed, staker);
+    return await stakeAllow(
+      this.wasm,
+      this.seed,
+      staker,
+      0,
+      this.gasLimit,
+      this.gasPrice
+    );
   } else {
-    return await stakeAllow(this.wasm, this.seed, staker, sender);
+    return await stakeAllow(
+      this.wasm,
+      this.seed,
+      staker,
+      sender,
+      this.gasLimit,
+      this.gasPrice
+    );
   }
 };
 export {

@@ -4,12 +4,13 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { toBytes } from "./wasm.js";
+import { toBytes, jsonFromBytes, call } from "./wasm.js";
 import {
   getU64RkyvSerialized,
   getNullifiersRkyvSerialized,
   getTreeLeafDeserialized,
 } from "./rkyv.js";
+import { getPublicKeyRkyvSerialized } from "./keys.js";
 import {
   stateDB,
   getLastPos,
@@ -240,6 +241,45 @@ export async function fetchOpenings(pos, node = LOCAL_NODE) {
   } catch (e) {
     console.log("Fetching Openings failed: " + e);
   }
+}
+
+/**
+ * Fetch the stake info from the network
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} seed
+ * @param {number} psk
+ * @returns {object} - object.has_staked, object.eligibility, object.amount, object.reward, object.counter, object.epoch object.has_key
+ */
+export async function stakeInfo(wasm, seed, index) {
+  const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
+
+  console.log("Fetching stake info");
+
+  const stakeInfoRequest = await request(
+    pk,
+    "get_stake",
+    false,
+    undefined,
+    process.env.STAKE_CONTRACT,
+    "1"
+  );
+
+  const stakeInfoRequestBuffer = await stakeInfoRequest.arrayBuffer();
+
+  const stakeInfoRequestBytes = new Uint8Array(stakeInfoRequestBuffer);
+
+  const args = JSON.stringify({
+    stake_info: Array.from(stakeInfoRequestBytes),
+  });
+
+  const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
+
+  let epoch = info.eligiblity / 2160;
+
+  // calculate epoch
+  info["epoch"] = epoch;
+
+  return info;
 }
 
 /**

@@ -14,8 +14,18 @@ import { luxToDusk } from "../crypto.js";
  * @param {string} sender - base58 encoded public spend key of the sender
  * @param {string} receiver - base58 encoded public spend key of the receiver
  * @param {number} amount - amount to transfer
+ * @param {number} gasLimit - gas limit
+ * @param {number} gasPrice - gas price
  */
-export function transfer(wasm, seed, sender, receiver, amount) {
+export function transfer(
+  wasm,
+  seed,
+  sender,
+  receiver,
+  amount,
+  gasLimit,
+  gasPrice
+) {
   // convert the amount from lux to dusk
   amount = luxToDusk(wasm, amount);
 
@@ -39,7 +49,7 @@ export function transfer(wasm, seed, sender, receiver, amount) {
     undefined,
     undefined,
     undefined,
-    500000000,
-    1
+    gasLimit,
+    gasPrice
   );
 }
