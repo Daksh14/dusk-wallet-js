@@ -4,16 +4,23 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { sync, stakeInfo } from "./node.js";
-import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import { getPsks } from "./keys.js";
 import { duskToLux } from "./crypto.js";
 import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
-import { stake, unstake, stakeAllow } from "./contracts/stake.js";
+import { txStatus } from "./graphql.js";
 
-// Export mnemnoic functions
-export { generateRandomMnemonic, getSeedFromMnemonic };
+import { sync, stakeInfo } from "./node.js";
+import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
+import {
+  stake,
+  unstake,
+  stakeAllow,
+  withdrawReward,
+} from "./contracts/stake.js";
+
+// Export mnemnoic functions and other helper functions
+export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
 
 /**
  * Construct a wallet from this function
@@ -38,7 +45,7 @@ export function Wallet(wasmExports, seed, gasLimit = 2900000000, gasPrice = 1) {
  *
  */
 Wallet.prototype.getBalance = function (psk, callback) {
-  getBalance(this.wasm, this.seed, psk, callback);
+  return getBalance(this.wasm, this.seed, psk, callback);
 };
 /**
  * Get psks for the seed
@@ -48,21 +55,21 @@ Wallet.prototype.getPsks = function () {
   return getPsks(this.wasm, this.seed);
 };
 /**
- * Get psks for the seed
- * @returns {Array<string>} psks Psks of the first 21 address for the seed
+ * Sync the wallet
+ * @returns {Promise} promise that resolves after the sync is complete
  */
-Wallet.prototype.sync = async function () {
-  return await sync(this.wasm, this.seed);
+Wallet.prototype.sync = function () {
+  return sync(this.wasm, this.seed);
 };
 /**
  * Transfer Dusk from sender psk to reciever psk
  * @param {string} sender bs58 encoded Psk to send the dusk from
  * @param {string} reciever bs68 encoded psk of the address who will receiver the dusk
  * @param {number} amount Amount of DUSK to send
- *
+ * @returns {Promise} promise that resolves after the transfer is accepted into blockchain
  */
-Wallet.prototype.transfer = async function (sender, reciever, amount) {
-  return await transfer(
+Wallet.prototype.transfer = function (sender, reciever, amount) {
+  return transfer(
     this.wasm,
     this.seed,
     sender,
@@ -76,8 +83,9 @@ Wallet.prototype.transfer = async function (sender, reciever, amount) {
  * Stake Dusk from the provided psk, refund to the same psk
  * @param {string} staker bs58 encoded Psk to stake from
  * @param {number} amount Amount of dusk to stake
+ * @returns {Promise} promise that resolves after the stake is accepted into blockchain
  */
-Wallet.prototype.stake = async function (staker, amount) {
+Wallet.prototype.stake = function (staker, amount) {
   const minStake = 1000;
   const index = this.getPsks().indexOf(staker);
 
@@ -89,32 +97,28 @@ Wallet.prototype.stake = async function (staker, amount) {
     throw new Error("Staker psk not found");
   }
 
-  const stakeAmount = async () => {
-    return await stake(
-      this.wasm,
-      this.seed,
-      index,
-      staker,
-      amount,
-      this.gasLimit,
-      this.gasPrice
-    );
-  };
-
-  this.getBalance(staker, async (bal) => {
+  return this.getBalance(staker, async (bal) => {
     if (bal.value < minStake) {
       throw new Error(
         `Balance needs to be greater than min stake amount of ${minStake}`
       );
     } else {
-      await stakeAmount();
+      await stake(
+        this.wasm,
+        this.seed,
+        index,
+        staker,
+        amount,
+        this.gasLimit,
+        this.gasPrice
+      );
     }
   });
 };
 /**
  * Fetches the info of the stake if the person has staked
  * @param {string} psk bs58 encoded Psk of the staker
- * @returns {object} stakeInfoResponse - objec.has_staked, object.eligibility, object.amount, object.reward, object.counter
+ * @returns {Promise} stakeInfoResponse - objec.has_staked, object.eligibility, object.amount, object.reward, object.counter, object.has_key, object.epoch
  */
 Wallet.prototype.stakeInfo = async function (psk) {
   const index = this.getPsks().indexOf(psk);
@@ -125,7 +129,7 @@ Wallet.prototype.stakeInfo = async function (psk) {
 
   const info = await stakeInfo(this.wasm, this.seed, index);
 
-  if (this.amount) {
+  if (info.amount) {
     info["amount"] = duskToLux(this.wasm, info.amount);
   }
 
@@ -134,15 +138,16 @@ Wallet.prototype.stakeInfo = async function (psk) {
 /**
  * Unstake dusk from the provided psk, refund to the same psk
  * @param {string} unstaker bs58 encoded psk to unstake from}
+ * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
  */
-Wallet.prototype.unstake = async function (unstaker) {
+Wallet.prototype.unstake = function (unstaker) {
   const index = this.getPsks().indexOf(unstaker);
 
   if (!index) {
     throw new Error("psk not found");
   }
 
-  return await unstake(
+  return unstake(
     this.wasm,
     this.seed,
     index,
@@ -156,18 +161,19 @@ Wallet.prototype.unstake = async function (unstaker) {
  * Allow staking dusk from the provided psk
  * @param {string} allowStakePsk psk to allow staking from
  * @param {string} senderPsk the psk of the sender, if undefined then index 0 (default index) is used
+ * @returns {Promise} promise resolves when stake allow request is obtained
  */
-Wallet.prototype.stakeAllow = async function (allowStakePsk, senderPsk) {
+Wallet.prototype.stakeAllow = function (allowStakePsk, senderPsk) {
   const psks = this.getPsks();
   const staker = psks.indexOf(allowStakePsk);
-  let sender = psks.indexOf(senderPsk);
+  const sender = psks.indexOf(senderPsk);
 
   if (staker === -1) {
     throw new Error("staker psk not found");
   }
 
   if (sender === -1) {
-    return await stakeAllow(
+    return stakeAllow(
       this.wasm,
       this.seed,
       staker,
@@ -176,7 +182,7 @@ Wallet.prototype.stakeAllow = async function (allowStakePsk, senderPsk) {
       this.gasPrice
     );
   } else {
-    return await stakeAllow(
+    return stakeAllow(
       this.wasm,
       this.seed,
       staker,
@@ -185,4 +191,21 @@ Wallet.prototype.stakeAllow = async function (allowStakePsk, senderPsk) {
       this.gasPrice
     );
   }
+};
+
+/**
+ * Withdraw reward
+ * @param {string} unstaker bs58 encoded psk to unstake from}
+ * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
+ */
+Wallet.prototype.withdrawReward = async function (psk) {
+  const index = this.getPsks().indexOf(psk);
+
+  await withdrawReward(
+    this.wasm,
+    this.seed,
+    index,
+    this.gasLimit,
+    this.gasPrice
+  );
 };

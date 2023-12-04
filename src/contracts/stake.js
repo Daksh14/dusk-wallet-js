@@ -5,10 +5,10 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { call, jsonFromBytes } from "../wasm.js";
-import { luxToDusk, duskToLux } from "../crypto.js";
+import { luxToDusk } from "../crypto.js";
 import { request, stakeInfo } from "../node.js";
 import { execute } from "../execute.js";
-import { getPsks, getPublicKeyRkyvSerialized } from "../keys.js";
+import { getPsks } from "../keys.js";
 
 /**
  *
@@ -111,7 +111,7 @@ export async function stake(
     value: amount,
   };
 
-  execute(
+  return execute(
     wasm,
     seed,
     rng_seed,
@@ -219,7 +219,7 @@ export async function unstake(
     value: 0,
   };
 
-  execute(
+  return execute(
     wasm,
     seed,
     rng_seed,
@@ -246,7 +246,7 @@ export async function stakeAllow(
   wasm,
   seed,
   staker_index,
-  sender_index = 0,
+  sender_index,
   gasLimit,
   gasPrice
 ) {
@@ -259,8 +259,8 @@ export async function stakeAllow(
 
   let counter = 0;
 
-  if (info.has_staked) {
-    throw new Error("staker_index already has existing stake");
+  if (info.has_key) {
+    throw new Error("staker_index is already allowed to  stake");
   }
 
   if (info.counter) {
@@ -271,8 +271,8 @@ export async function stakeAllow(
     rng_seed: Array.from(rng_seed),
     seed: seed,
     refund: refund,
-    sender_index: staker_index,
-    owner_index: sender_index,
+    sender_index: sender_index,
+    owner_index: staker_index,
     counter: counter,
     gas_limit: gasLimit,
     gas_price: gasPrice,
@@ -294,7 +294,7 @@ export async function stakeAllow(
     value: 0,
   };
 
-  execute(
+  return execute(
     wasm,
     seed,
     rng_seed,
@@ -369,7 +369,7 @@ export async function withdrawReward(
     value: 0,
   };
 
-  execute(
+  return execute(
     wasm,
     seed,
     rng_seed,

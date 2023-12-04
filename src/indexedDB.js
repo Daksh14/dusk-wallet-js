@@ -3,7 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
-import { Dexie } from "../deps.js";
+import { Dexie, indexedDB } from "../deps.js";
+
+if (globalThis.indexedDB === undefined) {
+  Dexie.dependencies.indexedDB = indexedDB;
+}
 
 /**
  * Persist the state of unspent_notes and spent_notes in the indexedDB
@@ -12,7 +16,7 @@ import { Dexie } from "../deps.js";
  * @param {Array<Uint8Array>} spent_notes
  * @param {number} pos The position we are at right now
  */
-export function stateDB(unspentNotes, spentNotes, pos) {
+export async function stateDB(unspentNotes, spentNotes, pos) {
   const db = new Dexie("state");
 
   db.version(1).stores({
@@ -26,17 +30,15 @@ export function stateDB(unspentNotes, spentNotes, pos) {
     localStorage.setItem("lastPos", pos.toString());
     console.log("Set last pos in local storage: " + pos);
   } catch (e) {
-    console.error(
-      "Cannot set pos in local storage, the walconst might be slow"
-    );
+    console.error("Cannot set pos in local storage, the wallet will be slow");
   }
 
-  db.unspentNotes
+  await db.unspentNotes
     .bulkPut(unspentNotes)
     .then(() => {
       console.log("Persisted unspent notes");
     })
-    .catch(Dexie.BulkError, function (e) {
+    .catch(function (e) {
       console.error(
         "Some insert operations did not while pushing unspent notes. " +
           e.failures.length +
@@ -44,10 +46,11 @@ export function stateDB(unspentNotes, spentNotes, pos) {
       );
     });
 
-  db.spentNotes
+  await db.spentNotes
     .bulkPut(spentNotes)
     .then(() => {
       console.log("Persisted spent notes");
+      db.close();
     })
     .catch(Dexie.BulkError, function (e) {
       console.error(
@@ -64,16 +67,20 @@ export function stateDB(unspentNotes, spentNotes, pos) {
  * @param {Function} callback - function(unspent_notes_array) {}
  * @returns {object} notes - unspent notes of the psk
  */
-export function getUnpsentNotes(psk, callback) {
-  const db = new Dexie("state");
+export async function getUnpsentNotes(psk, callback) {
+  const dbHandle = new Dexie("state");
 
-  db.open()
+  await dbHandle
+    .open()
     .then(async (db) => {
       const myTable = db.table("unspentNotes");
+
       if (myTable) {
         const notes = myTable.filter((note) => note.psk == psk);
-        const result = await notes.toArray();
-        await callback(result);
+
+        await notes.toArray().then(async (result) => {
+          await callback(result);
+        });
       }
     })
     .catch((error) => {
@@ -86,16 +93,18 @@ export function getUnpsentNotes(psk, callback) {
  * @param {string} psk - bs58 encoded public spend key to fetch the unspent notes of
  * @returns {object} notes-  spent notes of the psk
  */
-export function getSpentNotes(psk, callback) {
+export async function getSpentNotes(psk, callback) {
   const db = new Dexie("state");
 
-  db.open()
+  await db
+    .open()
     .then(async (db) => {
       const myTable = db.table("spentNotes");
       if (myTable) {
         const notes = myTable.filter((note) => note.psk == psk);
-        const result = await notes.toArray();
-        callback(result);
+        await notes.toArray().then(async (result) => {
+          await callback(result);
+        });
       }
     })
     .catch((error) => {
@@ -108,7 +117,7 @@ export function getSpentNotes(psk, callback) {
  * 0 by default
  * @returns {number} lastPos the position where to fetch from
  */
-export async function getLastPos() {
+export function getLastPos() {
   try {
     const lastPos = localStorage.getItem("lastPos");
 
@@ -134,15 +143,17 @@ export async function getLastPos() {
  * Fetch all unspent notes from the IndexedDB if there are any
  * @param {Function} callback - function(all_unspent_notes) {}
  */
-export function getAllUnpsentNotes(callback) {
+export async function getAllUnpsentNotes(callback) {
   const db = new Dexie("state");
 
-  db.open()
-    .then((db) => {
+  await db
+    .open()
+    .then(async (db) => {
       const myTable = db.table("unspentNotes");
       if (myTable) {
-        const result = myTable.toArray();
-        callback(result);
+        await myTable.toArray().then(async (result) => {
+          await callback(result);
+        });
       }
     })
     .catch((error) => {
@@ -154,23 +165,24 @@ export function getAllUnpsentNotes(callback) {
 /* @param {Array<number>} unspentNotesPos - ids of the unspent notes to delete
 /* @param {Array<object>} spentNotes - spent notes to insert
 */
-export function deleteUnspentNotesInsertSpentNotes(
+export async function deleteUnspentNotesInsertSpentNotes(
   unspentNotesPos,
   spentNotes
 ) {
   const db = new Dexie("state");
 
-  db.open()
-    .then((db) => {
+  await db
+    .open()
+    .then(async (db) => {
       const unspentNotesTable = db.table("unspentNotes");
       if (unspentNotesTable) {
-        unspentNotesTable.bulkDelete(unspentNotesPos);
+        await unspentNotesTable.bulkDelete(unspentNotesPos);
       }
 
       const spentNotesTable = db.table("spentNotes");
 
       if (spentNotesTable) {
-        spentNotesTable.bulkPut(spentNotes);
+        await spentNotesTable.bulkPut(spentNotes);
       }
     })
     .catch(Dexie.BulkError, function (e) {
@@ -180,4 +192,19 @@ export function deleteUnspentNotesInsertSpentNotes(
           " failures"
       );
     });
+}
+
+export async function getAllNotes(callback) {
+  const db = new Dexie("state");
+
+  await db.open().then(async (db) => {
+    const unspentNotesTable = db.table("unspentNotes");
+    const spentNotesTable = db.table("spentNotes");
+
+    await unspentNotesTable.toArray().then(async (unspent) => {
+      await spentNotesTable.toArray().then(async (spent) => {
+        await callback(spent.concat(unspent));
+      });
+    });
+  });
 }

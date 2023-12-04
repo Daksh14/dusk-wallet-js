@@ -16,6 +16,7 @@ import { unspentSpentNotes } from "./crypto.js";
 import { call, jsonFromBytes } from "./wasm.js";
 import { getPsks } from "./keys.js";
 import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
+import { txStatus, waitTillAccept } from "./graphql.js";
 
 /**
  *
@@ -29,6 +30,7 @@ import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
  * @param {any} fee - Fee rkyv serialized
  * @param {number} gas_limit - gas_limit value
  * @param {number} gas_price - gas_price value
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export function execute(
   wasm,
@@ -44,9 +46,9 @@ export function execute(
 ) {
   const sender_index = getPsks(wasm, seed).indexOf(psk);
 
-  getUnpsentNotes(psk, async (notes) => {
+  return getUnpsentNotes(psk, async (notes) => {
     const openings = [];
-    let allNotes = [];
+    const allNotes = [];
     const psks = [];
     const nullifiers = [];
 
@@ -111,9 +113,11 @@ export function execute(
     const bytes = new Uint8Array(buffer);
     // prove and propogate tx
     const tx = proveTx(wasm, unprovenTx, bytes);
+    const txBytes = tx.bytes;
+    const txHash = tx.hash;
 
     const preVerifyReq = await request(
-      tx,
+      txBytes,
       "preverify",
       false,
       undefined,
@@ -124,7 +128,7 @@ export function execute(
     console.log("preverify request status code: " + preVerifyReq.status);
 
     const propogateReq = await request(
-      tx,
+      txBytes,
       "propagate_tx",
       false,
       undefined,
@@ -133,5 +137,7 @@ export function execute(
     );
 
     console.log("propogating chain request status: " + propogateReq.status);
+
+    await waitTillAccept(txHash);
   });
 }

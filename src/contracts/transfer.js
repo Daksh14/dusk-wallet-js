@@ -40,7 +40,7 @@ export function transfer(
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
 
-  execute(
+  return execute(
     wasm,
     seed,
     rng_seed,

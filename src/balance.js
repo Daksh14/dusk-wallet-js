@@ -18,7 +18,7 @@ import { duskToLux } from "./crypto.js";
  * @returns {object} balanceResponse - object.maximum and object.value
  */
 export function getBalance(wasm, seed, psk, callback) {
-  getUnpsentNotes(psk, function (notes) {
+  return getUnpsentNotes(psk, async (notes) => {
     const unspentNotes = notes.map((object) => object.note);
 
     const serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
@@ -34,6 +34,6 @@ export function getBalance(wasm, seed, psk, callback) {
     obj.value = duskToLux(wasm, obj.value);
     obj.maximum = duskToLux(wasm, obj.maximum);
 
-    callback(obj);
+    await callback(obj);
   });
 }

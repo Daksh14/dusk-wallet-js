@@ -43,6 +43,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
   const lastPosDB = await getLastPos();
+
   // Get the leafs from the position above
   const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
@@ -66,7 +67,6 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
 
       const note = treeLeaf.note;
-      const blockHeight = treeLeaf.block_height;
       const pos = treeLeaf.last_pos;
 
       const owned = checkIfOwned(wasm, seed, note);
@@ -114,7 +114,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     // last pos we have on the db then we need to update it
     lastPos >= lastPosDB
   ) {
-    stateDB(unspentNotes, spentNotes, lastPos);
+    await stateDB(unspentNotes, spentNotes, lastPos);
   }
 
   // Move the unspent notes to spent notes if they were spent
@@ -124,7 +124,6 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const unspentNotesPos = [];
 
   const correctNotes = async () => {
-    console.log("nullifiers", unspentNotesNullifiers);
     // get the nullifiers
     const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
       wasm,
@@ -144,6 +143,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     const unspentNotesExistingNullifiersBytes = new Uint8Array(
       unspentNotesExistingNullifiers
     );
+
     // calculate the unspent and spent notes
     // from all the unspent note in the db
     // their nullifiers
@@ -159,10 +159,10 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
     const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
 
-    deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
+    await deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
   };
   // grab all the unspent notes and put the data of those unspent notes in arrays
-  getAllUnpsentNotes(async (allUnspentNotes) => {
+  await getAllUnpsentNotes(async (allUnspentNotes) => {
     for (const unspentNote of await allUnspentNotes) {
       unspentNotesNullifiers.push(unspentNote.nullifier);
       unspentNotesTemp.push(unspentNote.note);
@@ -170,7 +170,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       unspentNotesPos.push(unspentNote.pos);
     }
     // start the correction of the notes
-    correctNotes();
+    await correctNotes();
   });
 }
 /**
@@ -183,7 +183,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
  * @param {string} targetType the target number in string
  * @returns {Response} response Result of the fetch
  */
-export async function request(
+export function request(
   data,
   request_name,
   stream,
@@ -211,17 +211,12 @@ export async function request(
     headers["Rusk-Feeder"] = "1";
   }
 
-  try {
-    /// http://127.0.0.1:8080/ + 1/ + 00002 = http://127.0.0.1:8080/1/00002
-    const resp = await fetch(node + targetType + "/" + target, {
-      method: "POST",
-      headers: headers,
-      body: request,
-    });
-    return resp;
-  } catch (e) {
-    throw new Error("Error while sending request to node: " + e);
-  }
+  /// http://127.0.0.1:8080/ + 1/ + 00002 = http://127.0.0.1:8080/1/00002
+  return fetch(node + targetType + "/" + target, {
+    method: "POST",
+    headers: headers,
+    body: request,
+  });
 }
 
 /**

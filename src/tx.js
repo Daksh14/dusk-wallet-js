@@ -36,5 +36,5 @@ export function proveTx(wasm, unprovenTx, proof) {
 
   const result = jsonFromBytes(call(wasm, args, wasm.prove_tx));
 
-  return result.bytes;
+  return result;
 }

@@ -35,7 +35,7 @@
       const initWasm = async () => {
         fetch("../assets/dusk-wallet-core-0.21.0.wasm")
           .then((response) => response.arrayBuffer())
-          .then((buffer) => WebAssembly.instantiate(buffer, imports))
+          .then((buffer) => WebAssembly.instantiate(buffer))
           .then(async (result) => {
             console.log("wasm loaded!: ", result);
             const exports = result.instance.exports;
@@ -56,9 +56,10 @@
 
             // wallet.transfer(psks[0], psks[2], 4000);
             // wallet.stake(psks[2], 2000);
-            // console.log(await wallet.stakeInfo(psks[2]));
+            console.log(await wallet.stakeInfo(psks[0]));
             // wallet.unstake(psks[2]);
             // wallet.stakeAllow(psks[2]);
+            // wallet.withdrawReward(psks[0]);
           })
           .catch((err) =>
             setTimeout(() => {
@@ -67,9 +68,9 @@
           );
       };
 
-      document.addEventListener("DOMContentLoaded", function (event) {
-        initWasm().catch((e) => console.error(e));
-      });
+      console.log("test");
+
+      initWasm().catch((e) => console.error(e));
     </script>
   </body>
 </html>
