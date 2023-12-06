@@ -14985,13 +14985,13 @@ async function graphQLRequest(query) {
   );
   const buffer = await req.arrayBuffer();
   const response = new Uint8Array(buffer);
-  return response;
+  const json = JSON.parse(new TextDecoder().decode(response));
+  return json;
 }
 async function txStatus(txid, callback) {
   await graphQLRequest(`query { tx(hash: "${txid}") { err }}`).then(
     (response) => {
-      const json = JSON.parse(new TextDecoder().decode(response));
-      callback(json);
+      callback(response);
     }
   );
 }
@@ -15300,7 +15300,6 @@ async function stakeAllow(wasm2, seed, staker_index, sender_index, gasLimit, gas
   crypto.getRandomValues(rng_seed);
   const senderStakeinfo = await stakeInfo(wasm2, seed, sender_index);
   const stakerStakeInfo = await stakeInfo(wasm2, seed, staker_index);
-  console.log("sender_index", sender_index);
   const refund = getPsks(wasm2, seed)[sender_index];
   let counter = 0;
   if (stakerStakeInfo.has_key) {

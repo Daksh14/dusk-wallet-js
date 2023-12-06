@@ -5,8 +5,26 @@ await emptyDir("./npm");
 await build({
   entryPoints: ["./src/mod.js"],
   outDir: "./npm",
-  shims: [],
-  testShims: [],
+  typeCheck: false,
+  scriptModule: false,
+  declaration: false,
+  test: false,
+  shims: {
+    custom: [
+      {
+        package: {
+          name: "dexie",
+          version: "3.2.4",
+        },
+        globalNames: [
+          {
+            name: "Dexie",
+            exportName: "default",
+          },
+        ],
+      },
+    ],
+  },
   package: {
     // package.json properties
     name: "@dusk-network/dusk-wallet-js",
