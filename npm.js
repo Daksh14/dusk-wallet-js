@@ -14,7 +14,6 @@ await build({
       {
         package: {
           name: "dexie",
-          version: "3.2.4",
         },
         globalNames: [
           {
