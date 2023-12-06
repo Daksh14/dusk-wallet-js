@@ -10,7 +10,7 @@ import { toBytes } from "./wasm.js";
 /**
  * Query the graphql rusk endpoint
  * @param {string} query graphql query in string
- * @returns {Uint8Array} response
+ * @returns {object} response json object
  */
 export async function graphQLRequest(query) {
   const bytes = toBytes(query);
@@ -26,7 +26,9 @@ export async function graphQLRequest(query) {
   const buffer = await req.arrayBuffer();
   const response = new Uint8Array(buffer);
 
-  return response;
+  const json = JSON.parse(new TextDecoder().decode(response));
+
+  return json;
 }
 
 /**
@@ -36,8 +38,7 @@ export async function graphQLRequest(query) {
 export async function txStatus(txid, callback) {
   await graphQLRequest(`query { tx(hash: "${txid}") { err }}`).then(
     (response) => {
-      const json = JSON.parse(new TextDecoder().decode(response));
-      callback(json);
+      callback(response);
     }
   );
 }
@@ -51,7 +52,7 @@ export function waitTillAccept(txHash) {
   return new Promise((resolve, reject) => {
     let i = 0;
 
-    setInterval(async () => {
+    const interval = setInterval(async () => {
       await txStatus(txHash, (status) => {
         i = i + 1;
 
@@ -62,6 +63,7 @@ export function waitTillAccept(txHash) {
         const remoteTxStatus = status.tx;
         // keep polling if we don't have a status yet
         if (remoteTxStatus) {
+          clearInterval(interval);
           // if we have an error, reject
           if (remoteTxStatus.err) {
             reject("error in tx: " + status.tx.err);
@@ -75,4 +77,27 @@ export function waitTillAccept(txHash) {
   });
 }
 
-export async function txHistory() {}
+/**
+ * Get the tx info given the block height from the node
+ * @param {number} block_height
+ * @returns {Array<object>} - {raw_tx, gas_spent}
+ */
+export async function txFromBlock(block_height) {
+  const ret = [];
+  const txRemote = await graphQLRequest(
+    `query { block(height: ${block_height}) { transactions {id, raw}}}`
+  );
+
+  for (const tx of txRemote.transactions) {
+    const spentTx = await graphQLRequest(
+      `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`
+    );
+
+    ret.push({
+      raw_tx: tx.raw,
+      gas_spent: spentTx.tx.gas_spent,
+    });
+  }
+
+  return ret;
+}

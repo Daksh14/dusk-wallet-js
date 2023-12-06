@@ -46,19 +46,19 @@
             let sync = await wallet.sync();
             let psks = wallet.getPsks();
 
-            wallet.getBalance(psks[0], (bal) => {
-              console.log(bal.value);
-            });
+            // wallet.getBalance(psks[0], (bal) => {
+            //   console.log(bal.value);
+            // });
 
-            wallet.getBalance(psks[2], (bal) => {
-              console.log(bal.value);
-            });
+            // wallet.getBalance(psks[2], (bal) => {
+            //   console.log(bal.value);
+            // });
 
             // wallet.transfer(psks[0], psks[2], 4000);
             // wallet.stake(psks[2], 2000);
-            console.log(await wallet.stakeInfo(psks[0]));
             // wallet.unstake(psks[2]);
-            // wallet.stakeAllow(psks[2]);
+            await wallet.stakeAllow(psks[2]);
+            // console.log(await wallet.stakeInfo(psks[2]));
             // wallet.withdrawReward(psks[0]);
           })
           .catch((err) =>

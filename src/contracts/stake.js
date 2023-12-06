@@ -253,18 +253,19 @@ export async function stakeAllow(
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
 
-  const info = await stakeInfo(wasm, seed, staker_index);
+  const senderStakeinfo = await stakeInfo(wasm, seed, sender_index);
+  const stakerStakeInfo = await stakeInfo(wasm, seed, staker_index);
 
   const refund = getPsks(wasm, seed)[sender_index];
 
   let counter = 0;
 
-  if (info.has_key) {
-    throw new Error("staker_index is already allowed to  stake");
+  if (stakerStakeInfo.has_key) {
+    throw new Error("staker_index is already allowed to stake");
   }
 
-  if (info.counter) {
-    counter = info.counter;
+  if (senderStakeinfo.counter) {
+    counter = senderStakeinfo.counter;
   }
 
   const args = JSON.stringify({

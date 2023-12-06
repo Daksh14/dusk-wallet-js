@@ -14998,7 +14998,7 @@ async function txStatus(txid, callback) {
 function waitTillAccept(txHash) {
   return new Promise((resolve, reject) => {
     let i = 0;
-    setInterval(async () => {
+    const interval = setInterval(async () => {
       await txStatus(txHash, (status) => {
         i = i + 1;
         if (i > 10) {
@@ -15006,6 +15006,7 @@ function waitTillAccept(txHash) {
         }
         const remoteTxStatus = status.tx;
         if (remoteTxStatus) {
+          clearInterval(interval);
           if (remoteTxStatus.err) {
             reject("error in tx: " + status.tx.err);
           } else {
@@ -15297,14 +15298,16 @@ async function unstake(wasm2, seed, sender_index, refund, gasLimit, gasPrice) {
 async function stakeAllow(wasm2, seed, staker_index, sender_index, gasLimit, gasPrice) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
-  const info = await stakeInfo(wasm2, seed, staker_index);
+  const senderStakeinfo = await stakeInfo(wasm2, seed, sender_index);
+  const stakerStakeInfo = await stakeInfo(wasm2, seed, staker_index);
+  console.log("sender_index", sender_index);
   const refund = getPsks(wasm2, seed)[sender_index];
   let counter = 0;
-  if (info.has_key) {
-    throw new Error("staker_index is already allowed to  stake");
+  if (stakerStakeInfo.has_key) {
+    throw new Error("staker_index is already allowed to stake");
   }
-  if (info.counter) {
-    counter = info.counter;
+  if (senderStakeinfo.counter) {
+    counter = senderStakeinfo.counter;
   }
   const args = JSON.stringify({
     rng_seed: Array.from(rng_seed),
