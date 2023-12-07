@@ -194,12 +194,21 @@ export async function deleteUnspentNotesInsertSpentNotes(
     });
 }
 
-export async function getAllNotes(callback) {
+/**
+ * Given bs58 encoded psk, fetch all the spent and unspent notes for that psk
+ * @param {string} psk
+ * @param {*} callback
+ */
+export async function getAllNotes(psk, callback) {
   const db = new Dexie("state");
 
   await db.open().then(async (db) => {
-    const unspentNotesTable = db.table("unspentNotes");
-    const spentNotesTable = db.table("spentNotes");
+    const unspentNotesTable = db
+      .table("unspentNotes")
+      .filter((note) => note.psk == psk);
+    const spentNotesTable = db
+      .table("spentNotes")
+      .filter((note) => note.psk == psk);
 
     await unspentNotesTable.toArray().then(async (unspent) => {
       await spentNotesTable.toArray().then(async (spent) => {

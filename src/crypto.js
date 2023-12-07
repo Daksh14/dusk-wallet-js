@@ -44,6 +44,7 @@ export function checkIfOwned(wasm, seed, note) {
  * @param {WebAssembly.Exports} wasm
  * @param {Array<Uint8Array>} notes Array of rkyv serialized notes
  * @param {Array<Uint8Array>} nullifiersOfNote Array of rkyv serialized BlsScalar
+ * @param {Array<number>} blockHeights Array of block heights of the notes
  * @param {Uint8Array} existingNullifiers Vec<BlsScalar> from the node
  * @param {Array<string>} psks Public spend keys of the notes
  * @returns {object} json of the response
@@ -52,12 +53,14 @@ export function unspentSpentNotes(
   wasm,
   notes,
   nullifiersOfNote,
+  blockHeights,
   existingNullifiers,
   psks
 ) {
   const args = JSON.stringify({
     notes: notes,
     nullifiers_of_notes: nullifiersOfNote,
+    block_heights: blockHeights,
     existing_nullifiers: Array.from(existingNullifiers),
     psks: psks,
   });

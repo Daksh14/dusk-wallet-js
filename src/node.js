@@ -57,6 +57,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const notes = [];
   const nullifiers = [];
   const psks = [];
+  const blockHeights = [];
   const positions = [];
   let lastPos = 0;
 
@@ -76,6 +77,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
 
         notes.push(note);
         positions.push(pos);
+        blockHeights.push(treeLeaf.block_height);
         nullifiers.push(owned.nullifier);
         psks.push(owned.public_spend_key);
       }
@@ -99,6 +101,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     wasm,
     notes,
     nullifiers,
+    blockHeights,
     existingNullifiersBytes,
     psks
   );
@@ -122,6 +125,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const unspentNotesTemp = [];
   const unspentNotesPsks = [];
   const unspentNotesPos = [];
+  const unspentNotesBlockHeights = [];
 
   const correctNotes = async () => {
     // get the nullifiers
@@ -151,6 +155,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       wasm,
       unspentNotesTemp,
       unspentNotesNullifiers,
+      unspentNotesBlockHeights,
       unspentNotesExistingNullifiersBytes,
       unspentNotesPsks
     );
@@ -168,6 +173,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
       unspentNotesTemp.push(unspentNote.note);
       unspentNotesPsks.push(unspentNote.psk);
       unspentNotesPos.push(unspentNote.pos);
+      unspentNotesBlockHeights.push(unspentNote.block_height);
     }
     // start the correction of the notes
     await correctNotes();

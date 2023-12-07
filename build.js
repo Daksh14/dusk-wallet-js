@@ -7,6 +7,7 @@
 import * as esbuild from "https://deno.land/x/esbuild@v0.19.4/mod.js";
 import { load } from "https://deno.land/std@0.204.0/dotenv/mod.ts";
 import { cache } from "https://deno.land/x/esbuild_plugin_cache@v0.2.10/mod.ts";
+import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.2/mod.ts";
 
 const importMap = { imports: {} };
 const env = await load({ export: true });
@@ -26,7 +27,7 @@ esbuild
     bundle: true,
     format: "esm",
     outfile: "dist/wallet.js",
-    plugins: [cache({ importMap, directory: "./cache" })],
+    plugins: [...denoPlugins(), cache({ importMap, directory: "./cache" })],
     define: envVariables,
   })
   .then(() => {

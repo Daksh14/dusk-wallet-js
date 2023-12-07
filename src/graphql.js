@@ -14,6 +14,7 @@ import { toBytes } from "./wasm.js";
  */
 export async function graphQLRequest(query) {
   const bytes = toBytes(query);
+
   const req = await request(
     bytes,
     "gql",
@@ -80,7 +81,7 @@ export function waitTillAccept(txHash) {
 /**
  * Get the tx info given the block height from the node
  * @param {number} block_height
- * @returns {Array<object>} - {raw_tx, gas_spent}
+ * @returns {Array<object>} - [{raw_tx, gas_spent}]
  */
 export async function txFromBlock(block_height) {
   const ret = [];
@@ -88,14 +89,14 @@ export async function txFromBlock(block_height) {
     `query { block(height: ${block_height}) { transactions {id, raw}}}`
   );
 
-  for (const tx of txRemote.transactions) {
+  for (const tx of txRemote.block.transactions) {
     const spentTx = await graphQLRequest(
       `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`
     );
 
     ret.push({
       raw_tx: tx.raw,
-      gas_spent: spentTx.tx.gas_spent,
+      gas_spent: spentTx.tx.gasSpent,
     });
   }
 

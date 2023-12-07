@@ -9,7 +9,7 @@ import { duskToLux } from "./crypto.js";
 import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
 import { txStatus } from "./graphql.js";
-
+import { history } from "./tx.js";
 import { sync, stakeInfo } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import {
@@ -208,4 +208,8 @@ Wallet.prototype.withdrawReward = async function (psk) {
     this.gasLimit,
     this.gasPrice
   );
+};
+
+Wallet.prototype.history = async function (psk, callback) {
+  return await history(this.wasm, this.seed, psk, callback);
 };
