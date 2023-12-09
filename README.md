@@ -13,6 +13,8 @@ This will create a `dist/wallet.js` which can be used on the frontend side
 
 ## Usage 
 
+[`example/index.html`](https://github.com/dusk-network/dusk-wallet-js/tree/main/example)
+
 ```html
 <script type="module">
   import { Wallet } from "../dist/wallet.js";
@@ -49,21 +51,43 @@ This will create a `dist/wallet.js` which can be used on the frontend side
 </script>
 ```
 
-## Syncronization
-To sync with the latest notes, call the `Wallet.sync()`. It saves the state in indexedDB and localstorage
-it will log the console.error if localstorage or indexedDB is `undefined`
+# Running the example
 
-## Operations
-After the sync is done and latest state is in the db, you can call 
-`Wallet.getBalance()` and calculate the balance with `spendable` and `value` as fields
-
-## Tx history
-run the wallet.getSpentNotes()
-
-## Testing
-Add integration test against a local node. Figure out how to run that in CI
-
-To run the example first build and then
 ```
-➜ deno task server
+➜ deno task buildServe
+```
+Then go to [`127.0.0.1:8000/example/index.html`](http://127.0.0.1:8000/example/index.html)
+
+### __NOTE__: **if you go to `localhost/example/index.html` then you will get a CORS error**
+
+# Usage Documentation
+[Check the wiki on detailed usage guide](https://github.com/dusk-network/dusk-wallet-js/wiki)
+
+# Testing
+Make sure you have the node running with the following genesis file
+
+```toml
+[acl.stake]
+owners = [
+    'oCqYsUMRqpRn2kSabH52Gt6FQCwH5JXj5MtRdYVtjMSJ73AFvdbPf98p3gz98fQwNy9ZBiDem6m9BivzURKFSKLYWP3N9JahSPZs9PnZ996P18rTGAjQTNFsxtbrKx79yWu',
+]
+allowlist = [
+    'oCqYsUMRqpRn2kSabH52Gt6FQCwH5JXj5MtRdYVtjMSJ73AFvdbPf98p3gz98fQwNy9ZBiDem6m9BivzURKFSKLYWP3N9JahSPZs9PnZ996P18rTGAjQTNFsxtbrKx79yWu',
+    'ocXXBAafr7xFqQTpC1vfdSYdHMXerbPCED2apyUVpLjkuycsizDxwA6b9D7UW91kG58PFKqm9U9NmY9VSwufUFL5rVRSnFSYxbiKK658TF6XjHsHGBzavFJcxAzjjBRM4eF'
+]
+
+[[balance]]
+address = '4ZH3oyfTuMHyWD1Rp4e7QKp5yK6wLrWvxHneufAiYBAjvereFvfjtDvTbBcZN5ZCsaoMo49s1LKPTwGpowik6QJG'
+seed = 0xdead_beef
+notes = [100_000_000_000_000]
+
+[[stake]]
+address = 'oCqYsUMRqpRn2kSabH52Gt6FQCwH5JXj5MtRdYVtjMSJ73AFvdbPf98p3gz98fQwNy9ZBiDem6m9BivzURKFSKLYWP3N9JahSPZs9PnZ996P18rTGAjQTNFsxtbrKx79yWu'
+amount = 1_000_000_000_000
+```
+
+And then run
+
+```
+deno task test
 ```
