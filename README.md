@@ -63,6 +63,9 @@ Then go to [`127.0.0.1:8000/example/index.html`](http://127.0.0.1:8000/example/i
 # Usage Documentation
 [Check the wiki on detailed usage guide](https://github.com/dusk-network/dusk-wallet-js/wiki)
 
+@ API Documentation
+[Check the github pages generated jsdoc](https://dusk-network.github.io/dusk-wallet-js/)
+
 # Testing
 Make sure you have the node running with the following genesis file
 
