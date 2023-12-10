@@ -6,11 +6,10 @@
 
 import { getPsks } from "./keys.js";
 import { duskToLux } from "./crypto.js";
-import { getBalance } from "./balance.js";
+import { getBalance, BalanceInfo } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
 import { txStatus } from "./graphql.js";
-import { history } from "./tx.js";
-import { sync, stakeInfo } from "./node.js";
+import { sync, stakeInfo, StakeInfo } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import {
   stake,
@@ -18,6 +17,7 @@ import {
   stakeAllow,
   withdrawReward,
 } from "./contracts/stake.js";
+import { history, History } from "./history.js";
 
 // Export mnemnoic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
@@ -25,11 +25,13 @@ export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
 /**
  * Construct a wallet from this function
  *
- * @param {WebAssembly.Exports} wasmExports The exports of the wallet-core wasm
+ * @class Wallet
+ * @type {Object}
+ * @property {WebAssembly.Exports} wasmExports The exports of the wallet-core wasm
  * binary https://github.com/dusk-network/wallet-core
- * @param {Uint8Array} seed The seed of the wallet
- * @param {number} gasLimit The gas limit of the wallet, default is 2900000000
- * @param {number} gasPrice The gas price of the wallet, default is 1
+ * @property {Uint8Array} seed The seed of the wallet
+ * @property {number} [gasLimit] The gas limit of the wallet, default is 2900000000
+ * @property {number} [gasPrice] The gas price of the wallet, default is 1
  */
 export function Wallet(wasmExports, seed, gasLimit = 2900000000, gasPrice = 1) {
   this.wasm = wasmExports;
@@ -41,12 +43,13 @@ export function Wallet(wasmExports, seed, gasLimit = 2900000000, gasPrice = 1) {
 /**
  * Get balance
  * @param {string} psk - bs58 encoded public spend key of the user we want to
- * @param {Function} callback - function(balance) {balance.maximum and balance.value}
- *
+ * @returns {Promise<BalanceInfo>} The balance info
+ * @memberof Wallet
  */
-Wallet.prototype.getBalance = function (psk, callback) {
-  return getBalance(this.wasm, this.seed, psk, callback);
+Wallet.prototype.getBalance = function (psk) {
+  return getBalance(this.wasm, this.seed, psk);
 };
+
 /**
  * Get psks for the seed
  * @returns {Array<string>} psks Psks of the first 21 address for the seed
@@ -54,6 +57,7 @@ Wallet.prototype.getBalance = function (psk, callback) {
 Wallet.prototype.getPsks = function () {
   return getPsks(this.wasm, this.seed);
 };
+
 /**
  * Sync the wallet
  * @returns {Promise} promise that resolves after the sync is complete
@@ -61,6 +65,7 @@ Wallet.prototype.getPsks = function () {
 Wallet.prototype.sync = function () {
   return sync(this.wasm, this.seed);
 };
+
 /**
  * Transfer Dusk from sender psk to reciever psk
  * @param {string} sender bs58 encoded Psk to send the dusk from
@@ -79,13 +84,14 @@ Wallet.prototype.transfer = function (sender, reciever, amount) {
     this.gasPrice
   );
 };
+
 /**
  * Stake Dusk from the provided psk, refund to the same psk
  * @param {string} staker bs58 encoded Psk to stake from
  * @param {number} amount Amount of dusk to stake
  * @returns {Promise} promise that resolves after the stake is accepted into blockchain
  */
-Wallet.prototype.stake = function (staker, amount) {
+Wallet.prototype.stake = async function (staker, amount) {
   const minStake = 1000;
   const index = this.getPsks().indexOf(staker);
 
@@ -97,28 +103,29 @@ Wallet.prototype.stake = function (staker, amount) {
     throw new Error("Staker psk not found");
   }
 
-  return this.getBalance(staker, async (bal) => {
-    if (bal.value < minStake) {
-      throw new Error(
-        `Balance needs to be greater than min stake amount of ${minStake}`
-      );
-    } else {
-      await stake(
-        this.wasm,
-        this.seed,
-        index,
-        staker,
-        amount,
-        this.gasLimit,
-        this.gasPrice
-      );
-    }
-  });
+  const bal = await this.getBalance(staker);
+
+  if (bal.value < minStake) {
+    throw new Error(
+      `Balance needs to be greater than min stake amount of ${minStake}`
+    );
+  } else {
+    return stake(
+      this.wasm,
+      this.seed,
+      index,
+      staker,
+      amount,
+      this.gasLimit,
+      this.gasPrice
+    );
+  }
 };
+
 /**
  * Fetches the info of the stake if the person has staked
  * @param {string} psk bs58 encoded Psk of the staker
- * @returns {Promise} stakeInfoResponse - objec.has_staked, object.eligibility, object.amount, object.reward, object.counter, object.has_key, object.epoch
+ * @returns {Promise<StakeInfo>} The stake info
  */
 Wallet.prototype.stakeInfo = async function (psk) {
   const index = this.getPsks().indexOf(psk);
@@ -160,7 +167,7 @@ Wallet.prototype.unstake = function (unstaker) {
 /**
  * Allow staking dusk from the provided psk
  * @param {string} allowStakePsk psk to allow staking from
- * @param {string} senderPsk the psk of the sender, if undefined then index 0 (default index) is used
+ * @param {string} [senderPsk] senderPsk the psk of the sender, if undefined then index 0 (default index) is used
  * @returns {Promise} promise resolves when stake allow request is obtained
  */
 Wallet.prototype.stakeAllow = function (allowStakePsk, senderPsk) {
@@ -198,10 +205,10 @@ Wallet.prototype.stakeAllow = function (allowStakePsk, senderPsk) {
  * @param {string} unstaker bs58 encoded psk to unstake from}
  * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
  */
-Wallet.prototype.withdrawReward = async function (psk) {
+Wallet.prototype.withdrawReward = function (psk) {
   const index = this.getPsks().indexOf(psk);
 
-  await withdrawReward(
+  return withdrawReward(
     this.wasm,
     this.seed,
     index,
@@ -210,6 +217,12 @@ Wallet.prototype.withdrawReward = async function (psk) {
   );
 };
 
-Wallet.prototype.history = async function (psk, callback) {
-  return await history(this.wasm, this.seed, psk, callback);
+/**
+ * Get the history of the wallet
+ *
+ * @param {string} psk - bs58 encoded public spend key of the user we want to fetch the history of
+ * @returns {Array<History>} The history of the wallet
+ */
+Wallet.prototype.history = function (psk) {
+  return history(this.wasm, this.seed, psk);
 };

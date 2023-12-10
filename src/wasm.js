@@ -40,7 +40,7 @@ function getAndFree(wasm, result) {
 }
 /**
  * Decompose a i64 output from a call into the packed pointer, length and sucess bit
- * @param result result of a wasm call
+ * @param {BigInt} result result of a wasm call
  * @returns {object} an object containing ptr, length and status bit
  */
 function decompose(result) {

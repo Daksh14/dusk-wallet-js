@@ -6,24 +6,20 @@ await build({
   entryPoints: ["./src/mod.js"],
   outDir: "./npm",
   typeCheck: false,
-  scriptModule: false,
   declaration: false,
   test: false,
-  shims: {
-    custom: [
-      {
-        package: {
-          name: "dexie",
-        },
-        globalNames: [
-          {
-            name: "Dexie",
-            exportName: "default",
-          },
-        ],
-      },
-    ],
+  mappings: {
+    "npm:fake-indexeddb": {
+      name: "fake-indexeddb",
+      version: "5.0.1",
+      peerDependency: true,
+    },
+    "https://unpkg.com/dexie/dist/dexie.mjs": {
+      name: "dexie",
+      version: "3.2.4",
+    },
   },
+  shims: [],
   package: {
     // package.json properties
     name: "@dusk-network/dusk-wallet-js",

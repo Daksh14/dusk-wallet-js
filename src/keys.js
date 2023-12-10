@@ -8,6 +8,7 @@ import { call, jsonFromBytes } from "./wasm.js";
 
 /**
  * Get the public spend keys in order from 1 to 24 for the seed
+ *
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed Seed of the walconst
  * @returns {Array<string>} psks base58 encoded public spend keys
@@ -23,6 +24,7 @@ export function getPsks(wasm, seed) {
 /**
  * Get the PublicKey rkyv serialized for a particular index
  * needed to fetch stake
+ *
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed Seed of the walconst
  * @param {number} index Index of the public spend key

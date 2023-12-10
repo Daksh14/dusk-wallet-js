@@ -16,6 +16,8 @@ import { luxToDusk } from "../crypto.js";
  * @param {number} amount - amount to transfer
  * @param {number} gasLimit - gas limit
  * @param {number} gasPrice - gas price
+ *
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export function transfer(
   wasm,

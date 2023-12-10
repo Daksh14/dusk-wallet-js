@@ -41,6 +41,7 @@ export function checkIfOwned(wasm, seed, note) {
 
 /**
  * Sort all the notes into unspent and spent notes given existing nullifiers
+ *
  * @param {WebAssembly.Exports} wasm
  * @param {Array<Uint8Array>} notes Array of rkyv serialized notes
  * @param {Array<Uint8Array>} nullifiersOfNote Array of rkyv serialized BlsScalar
@@ -82,7 +83,8 @@ export function duskToLux(wasm, dusk) {
   return jsonFromBytes(call(wasm, args, wasm.dusk_to_lux)).lux;
 }
 
-/** Convert lux to dusk
+/**
+ * Convert lux to dusk
  * @param {WebAssembly.Exports} wasm
  * @param {number} lux Lux amount to convert to dusk
  * @returns {number} dusk amount

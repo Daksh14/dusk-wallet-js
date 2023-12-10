@@ -6,7 +6,7 @@ const app = new Application();
 // The domain for LOCAL_NODE for example purposes
 app.use(
   oakCors({
-    origin: "http://127:8080",
+    origin: "http://127.0.0.1:8080",
   })
 );
 
@@ -22,7 +22,7 @@ app.use(async (context, next) => {
 });
 
 console.log(
-  "Starting example server at http://localhost:8000/example/index.html"
+  "Starting example server at http://127.0.0.1:8000/example/index.html"
 );
 
 await app.listen({ port: 8000 });

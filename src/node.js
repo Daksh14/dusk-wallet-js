@@ -11,18 +11,41 @@ import {
   getTreeLeafDeserialized,
 } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
-import {
-  stateDB,
-  getLastPos,
-  getAllUnpsentNotes,
-  deleteUnspentNotesInsertSpentNotes,
-} from "./indexedDB.js";
+import { insertSpentUnspentNotes, getLastPos, correctNotes } from "./db.js";
 import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
 
 // env variables
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const LOCAL_NODE = process.env.LOCAL_NODE;
+
+/**
+ *
+ * @param {boolean} has_key If the user has the key in the allow list or not
+ * @param {boolean} has_staked If the user has staked before
+ * @param {number} eligiblity The eligiblity if they have staked
+ * @param {number} amount The amount staked
+ * @param {number} reward The reward of the stake
+ * @param {number} counter The number of transactions done by the user
+ * @param {number} epoch The epoch of the stake in the block chain
+ */
+export function StakeInfo(
+  has_key,
+  has_staked,
+  eligiblity,
+  amount,
+  reward,
+  counter,
+  epoch
+) {
+  this.has_key = has_key;
+  this.has_staked = has_staked;
+  this.eligiblity = eligiblity;
+  this.amount = amount;
+  this.reward = reward;
+  this.counter = counter;
+  this.epoch = epoch;
+}
 
 /**
  * This the most expensive function in this library,
@@ -33,7 +56,7 @@ const LOCAL_NODE = process.env.LOCAL_NODE;
  *
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed The seed of the walconst
- *
+ * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, node = LOCAL_NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
@@ -51,6 +74,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     true,
     node
   );
+
   // what an indivdual leaf would be
   let leaf;
   // The notes we get from the network which we own.
@@ -87,15 +111,9 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
 
   // Fetch existing nullifiers from the node
-  const existingNullifiersRemote = await request(
-    nullifiersSerialized,
-    "existing_nullifiers",
-    false
+  const existingNullifiersBytes = await responseBytes(
+    await request(nullifiersSerialized, "existing_nullifiers", false)
   );
-
-  const existingNullifiers = await existingNullifiersRemote.arrayBuffer();
-
-  const existingNullifiersBytes = new Uint8Array(existingNullifiers);
 
   const allNotes = unspentSpentNotes(
     wasm,
@@ -110,74 +128,11 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const spentNotes = Array.from(allNotes.spent_notes);
 
   // if we have anything to insert then we insert
-  if (
-    unspentNotes.length > 0 ||
-    spentNotes.length > 0 ||
-    // if the last pos we get from the node is bigger than the
-    // last pos we have on the db then we need to update it
-    lastPos >= lastPosDB
-  ) {
-    await stateDB(unspentNotes, spentNotes, lastPos);
+  if (unspentNotes.length > 0 || spentNotes.length > 0) {
+    await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
   }
 
-  // Move the unspent notes to spent notes if they were spent
-  const unspentNotesNullifiers = [];
-  const unspentNotesTemp = [];
-  const unspentNotesPsks = [];
-  const unspentNotesPos = [];
-  const unspentNotesBlockHeights = [];
-
-  const correctNotes = async () => {
-    // get the nullifiers
-    const unspentNotesNullifiersSerialized = getNullifiersRkyvSerialized(
-      wasm,
-      unspentNotesNullifiers
-    );
-
-    // Fetch existing nullifiers from the node
-    const unpsentNotesExistingNullifiersRemote = await request(
-      unspentNotesNullifiersSerialized,
-      "existing_nullifiers",
-      false
-    );
-
-    const unspentNotesExistingNullifiers =
-      await unpsentNotesExistingNullifiersRemote.arrayBuffer();
-
-    const unspentNotesExistingNullifiersBytes = new Uint8Array(
-      unspentNotesExistingNullifiers
-    );
-
-    // calculate the unspent and spent notes
-    // from all the unspent note in the db
-    // their nullifiers
-    const correctedNotes = unspentSpentNotes(
-      wasm,
-      unspentNotesTemp,
-      unspentNotesNullifiers,
-      unspentNotesBlockHeights,
-      unspentNotesExistingNullifiersBytes,
-      unspentNotesPsks
-    );
-
-    // These are the spent notes which were unspent before
-    const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
-    const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
-
-    await deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
-  };
-  // grab all the unspent notes and put the data of those unspent notes in arrays
-  await getAllUnpsentNotes(async (allUnspentNotes) => {
-    for (const unspentNote of await allUnspentNotes) {
-      unspentNotesNullifiers.push(unspentNote.nullifier);
-      unspentNotesTemp.push(unspentNote.note);
-      unspentNotesPsks.push(unspentNote.psk);
-      unspentNotesPos.push(unspentNote.pos);
-      unspentNotesBlockHeights.push(unspentNote.block_height);
-    }
-    // start the correction of the notes
-    await correctNotes();
-  });
+  return correctNotes(wasm);
 }
 /**
  * By default query the transfer contract unless given otherwise
@@ -226,22 +181,13 @@ export function request(
 }
 
 /**
- *
+ * Fetch openings from the node
  * @param {number} pos - Position of the note we want the opening of
  * @param {string} node - Node address
  * @returns {Uint8Array} - Bytes of the UInt8Array
  */
 export async function fetchOpenings(pos, node = LOCAL_NODE) {
-  try {
-    const response = await request(pos, "opening", false, node);
-
-    const buffer = await response.arrayBuffer();
-
-    const bytes = new Uint8Array(buffer);
-    return bytes;
-  } catch (e) {
-    console.log("Fetching Openings failed: " + e);
-  }
+  return responseBytes(await request(pos, "opening", false, node));
 }
 
 /**
@@ -249,38 +195,49 @@ export async function fetchOpenings(pos, node = LOCAL_NODE) {
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed
  * @param {number} psk
- * @returns {object} - object.has_staked, object.eligibility, object.amount, object.reward, object.counter, object.epoch object.has_key
+ * @returns {StakeInfo} Info about the stake
  */
 export async function stakeInfo(wasm, seed, index) {
   const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
 
   console.log("Fetching stake info");
 
-  const stakeInfoRequest = await request(
-    pk,
-    "get_stake",
-    false,
-    undefined,
-    process.env.STAKE_CONTRACT,
-    "1"
+  const stakeInfoRequest = await responseBytes(
+    await request(
+      pk,
+      "get_stake",
+      false,
+      undefined,
+      process.env.STAKE_CONTRACT,
+      "1"
+    )
   );
 
-  const stakeInfoRequestBuffer = await stakeInfoRequest.arrayBuffer();
-
-  const stakeInfoRequestBytes = new Uint8Array(stakeInfoRequestBuffer);
-
   const args = JSON.stringify({
-    stake_info: Array.from(stakeInfoRequestBytes),
+    stake_info: Array.from(stakeInfoRequest),
   });
 
   const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
 
-  let epoch = info.eligiblity / 2160;
+  return new StakeInfo(
+    info.has_key,
+    info.has_staked,
+    info.eligiblity,
+    info.amount,
+    info.reward,
+    info.counter,
+    // calculating epoch
+    info.eligiblity / 2160
+  );
+}
 
-  // calculate epoch
-  info["epoch"] = epoch;
-
-  return info;
+/**
+ * Helper function to convert the response into bytes
+ * @param {Response} response The response from the fetch api
+ * @returns {Promise<Uint8Array>} bytes of the response
+ */
+export async function responseBytes(response) {
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 /**

@@ -1,4 +1,8 @@
 import { Wallet } from "../dist/wallet.js"; // url_test.ts
+import {
+  generateRandomMnemonic,
+  getSeedFromMnemonic,
+} from "../src/mnemonic.js";
 import { assert, assertEquals } from "../deps.js";
 
 const DEFAULT_SEED = [
@@ -214,12 +218,48 @@ Deno.test({
 });
 
 Deno.test({
+  name: "random_mnemonic_test",
+  fn() {
+    const string = generateRandomMnemonic(exports);
+    const words = string.split(" ");
+
+    assertEquals(words.length, 24);
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "seed_and_passphrase_test",
+  fn() {
+    const seed = getSeedFromMnemonic(
+      exports,
+      "auction tribe type torch domain caution lyrics mouse alert fabric snake ticket",
+      "test"
+    );
+
+    assertEquals(
+      seed,
+      [
+        132, 194, 68, 186, 90, 80, 24, 166, 88, 8, 196, 131, 2, 20, 4, 7, 97,
+        219, 237, 76, 4, 110, 176, 149, 79, 89, 142, 64, 76, 77, 250, 52, 50,
+        33, 177, 84, 22, 103, 144, 135, 102, 96, 137, 151, 97, 50, 197, 232, 93,
+        225, 249, 87, 100, 105, 100, 240, 219, 79, 64, 97, 26, 227, 185, 124,
+      ]
+    );
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
   name: "tx_history_check",
   async fn() {
     await wallet.sync().then(async () => {
       await wallet.history(psks[0], (history) => {
+        console.log(history);
         assertEquals(history[0].amount, -4000.001);
-        assertEquals(history[0].bloch_height, 15);
+        assertEquals(history[0].block_height, 15);
         assertEquals(history[0].direction, "Out");
         assertEquals(history[0].fee, 1000000);
         assertEquals(
@@ -228,7 +268,7 @@ Deno.test({
         );
 
         assertEquals(history[1].amount, 691.182775274);
-        assertEquals(history[1].bloch_height, 49);
+        assertEquals(history[1].block_height, 49);
         assertEquals(history[1].direction, "Out");
         assertEquals(history[1].fee, 29373240);
         assertEquals(
@@ -237,7 +277,7 @@ Deno.test({
         );
 
         assertEquals(history[2].amount, -0.004130011);
-        assertEquals(history[2].bloch_height, 66);
+        assertEquals(history[2].block_height, 66);
         assertEquals(history[2].direction, "Out");
         assertEquals(history[2].fee, 4130011);
         assertEquals(

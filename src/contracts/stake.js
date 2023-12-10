@@ -19,6 +19,8 @@ import { getPsks } from "../keys.js";
  * @param {number} amount amount to stake
  * @param {number} gasLimit gas limit
  * @param {number} gasPrice gas price
+ *
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export async function stake(
   wasm,
@@ -133,6 +135,8 @@ export async function stake(
  * @param {string} refund psk to refund this tx to
  * @param {number} gasLimit gas limit
  * @param {number} gasPrice gas price
+ *
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export async function unstake(
   wasm,
@@ -241,6 +245,8 @@ export async function unstake(
  * @param {number} sender_index Index of the sender, if undefined we use the default one
  * @param {number} gasLimit gas limit
  * @param {number} gasPrice gas price
+ *
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export async function stakeAllow(
   wasm,
@@ -316,6 +322,8 @@ export async function stakeAllow(
  * @param {number} staker_index the index of the staker who wants to withdraw the reward
  * @param {number} gasLimit gas limit
  * @param {number} gasPrice gas price
+ *
+ * @returns {Promise} Promise object which resolves after the tx gets accepted into the blockchain
  */
 export async function withdrawReward(
   wasm,

@@ -57,7 +57,7 @@ export function waitTillAccept(txHash) {
       await txStatus(txHash, (status) => {
         i = i + 1;
 
-        if (i > 10) {
+        if (i > 30) {
           reject("tx was not accepted in 10 seconds");
         }
 
