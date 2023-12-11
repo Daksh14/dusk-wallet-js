@@ -40,9 +40,7 @@ This will create a `dist/wallet.js` which can be used on the frontend side
     // sync the wallet using IndexedDB, everything is managed internally
     let sync = await wallet.sync();
     // get balance for the first public spend key
-    let balance = wallet.getBalance(psks[0], (bal) => {
-      console.log(bal.value);
-    });
+    let balance = await wallet.getBalance(psks[0]);
   };
 
   document.addEventListener("DOMContentLoaded", function (event) {
