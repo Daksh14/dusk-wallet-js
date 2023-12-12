@@ -38,9 +38,9 @@ jobs:
         docker run --name rusk -d -p 9000:9000/udp -p 8080:8080/tcp -v ${{ github.workspace }}/genesis.toml:/opt/rusk/state.toml dusknetwork/node:latest
 
     - name: Install Deno
-      uses: denolib/setup-deno@v2
+      uses: denoland/setup-deno@v1
       with:
-        deno-version: 'latest'
+        deno-version: v1.x
 
     - name: Run Tests
       run: deno task test
