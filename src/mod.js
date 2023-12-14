@@ -19,7 +19,7 @@ import {
 } from "./contracts/stake.js";
 import { history, History } from "./history.js";
 
-// Export mnemnoic functions and other helper functions
+// Export mnemonic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
 
 /**
@@ -67,18 +67,18 @@ Wallet.prototype.sync = function () {
 };
 
 /**
- * Transfer Dusk from sender psk to reciever psk
+ * Transfer Dusk from sender psk to receiver psk
  * @param {string} sender bs58 encoded Psk to send the dusk from
- * @param {string} reciever bs68 encoded psk of the address who will receiver the dusk
+ * @param {string} receiver bs68 encoded psk of the address who will receive the Dusk
  * @param {number} amount Amount of DUSK to send
  * @returns {Promise} promise that resolves after the transfer is accepted into blockchain
  */
-Wallet.prototype.transfer = function (sender, reciever, amount) {
+Wallet.prototype.transfer = function (sender, receiver, amount) {
   return transfer(
     this.wasm,
     this.seed,
     sender,
-    reciever,
+    receiver,
     amount,
     this.gasLimit,
     this.gasPrice
@@ -144,7 +144,7 @@ Wallet.prototype.stakeInfo = async function (psk) {
 };
 /**
  * Unstake dusk from the provided psk, refund to the same psk
- * @param {string} unstaker bs58 encoded psk to unstake from}
+ * @param {string} unstaker bs58 encoded psk to unstake from
  * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
  */
 Wallet.prototype.unstake = function (unstaker) {
@@ -202,7 +202,7 @@ Wallet.prototype.stakeAllow = function (allowStakePsk, senderPsk) {
 
 /**
  * Withdraw reward
- * @param {string} unstaker bs58 encoded psk to unstake from}
+ * @param {string} unstaker bs58 encoded psk to unstake from
  * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
  */
 Wallet.prototype.withdrawReward = function (psk) {
