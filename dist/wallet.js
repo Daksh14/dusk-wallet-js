@@ -8017,6 +8017,10 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   for await (const chunk of resp.body) {
     for (let i = 0; i < chunk.length; i += leafSize) {
       leaf = chunk.slice(i, i + leafSize);
+      if (!leaf || leaf.length == 0) {
+        console.warn("no leaf found from the node");
+        break;
+      }
       const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
       const note = treeLeaf.note;
       const pos = treeLeaf.last_pos;
@@ -8147,15 +8151,19 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
     );
   });
 }
-async function getUnpsentNotes(psk) {
+async function getUnpsentNotes(psk2) {
   const dbHandle = new Dexie$1("state");
   const db = await dbHandle.open().catch((error) => {
     console.error("Error while getting unspent notes: " + error);
   });
   const myTable = db.table("unspentNotes");
   if (myTable) {
-    const notes = myTable.filter((note) => note.psk == psk);
-    return notes.toArray();
+    const notes = myTable.filter((note) => note.psk == psk2);
+    const result = await notes.toArray();
+    if (!result) {
+      throw new Error("No unpsent notes found for the psk: " + psk2);
+    }
+    return result;
   }
 }
 function getLastPos() {
@@ -8176,14 +8184,18 @@ function getLastPos() {
     console.error("Cannot retrieve lastPos in local storage", e);
   }
 }
-async function getAllNotes(psk) {
+async function getAllNotes(psk2) {
   const dbHandle = new Dexie$1("state");
   const db = await dbHandle.open();
-  const unspentNotesTable = db.table("unspentNotes").filter((note) => note.psk == psk);
-  const spentNotesTable = db.table("spentNotes").filter((note) => note.psk == psk);
+  const unspentNotesTable = db.table("unspentNotes").filter((note) => note.psk == psk2);
+  const spentNotesTable = db.table("spentNotes").filter((note) => note.psk == psk2);
   const unspent = await unspentNotesTable.toArray();
   const spent = await spentNotesTable.toArray();
-  return spent.concat(unspent);
+  const concat2 = spent.concat(unspent);
+  if (!concat2) {
+    throw new Error("No notes found for the psk: " + psk2);
+  }
+  return concat2;
 }
 async function correctNotes(wasm) {
   const unspentNotesNullifiers = [];
@@ -8229,7 +8241,11 @@ async function getAllUnpsentNotes() {
   });
   const myTable = db.table("unspentNotes");
   if (myTable) {
-    return myTable.toArray();
+    const result = await myTable.toArray();
+    if (!result) {
+      throw new Error("No unspent notes found for the psk: " + psk);
+    }
+    return result;
   }
 }
 async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
@@ -8250,8 +8266,8 @@ async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
 }
 
 // src/balance.js
-async function getBalance(wasm, seed, psk) {
-  const notes = await getUnpsentNotes(psk);
+async function getBalance(wasm, seed, psk2) {
+  const notes = await getUnpsentNotes(psk2);
   const unspentNotes = notes.map((object) => object.note);
   const serializedNotes = getNotesRkyvSerialized(wasm, unspentNotes);
   const balanceArgs = JSON.stringify({
@@ -8344,9 +8360,9 @@ async function txFromBlock(block_height) {
 }
 
 // src/execute.js
-async function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, gas_limit, gas_price) {
-  const sender_index = getPsks(wasm, seed).indexOf(psk);
-  const notes = await getUnpsentNotes(psk);
+async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, fee, gas_limit, gas_price) {
+  const sender_index = getPsks(wasm, seed).indexOf(psk2);
+  const notes = await getUnpsentNotes(psk2);
   const openings = [];
   const allNotes = [];
   const psks = [];
@@ -8374,7 +8390,7 @@ async function execute(wasm, seed, rng_seed, psk, output, callData, crossover, f
     fee,
     rng_seed: Array.from(rng_seed),
     inputs,
-    refund: psk,
+    refund: psk2,
     output,
     openings: openingsSerialized,
     sender_index,
@@ -8716,11 +8732,11 @@ async function withdrawReward(wasm, seed, staker_index, gasLimit, gasPrice) {
 }
 
 // src/history.js
-async function history(wasm, seed, psk) {
-  const notes = await getAllNotes(psk);
+async function history(wasm, seed, psk2) {
+  const notes = await getAllNotes(psk2);
   const txData = [];
   const noteData = [];
-  const index = getPsks(wasm, seed).indexOf(psk);
+  const index = getPsks(wasm, seed).indexOf(psk2);
   for (const note of notes) {
     const blockHeight = note.block_height;
     const txs = await txFromBlock(blockHeight);
@@ -8753,8 +8769,8 @@ function Wallet(wasmExports, seed, gasLimit = 29e8, gasPrice = 1) {
   this.gasLimit = gasLimit;
   this.gasPrice = gasPrice;
 }
-Wallet.prototype.getBalance = function(psk) {
-  return getBalance(this.wasm, this.seed, psk);
+Wallet.prototype.getBalance = function(psk2) {
+  return getBalance(this.wasm, this.seed, psk2);
 };
 Wallet.prototype.getPsks = function() {
   return getPsks(this.wasm, this.seed);
@@ -8779,7 +8795,7 @@ Wallet.prototype.stake = async function(staker, amount) {
   if (amount < minStake) {
     throw new Error(`Stake amount needs to be above a ${minStake} dusk`);
   }
-  if (!index) {
+  if (index === -1) {
     throw new Error("Staker psk not found");
   }
   const bal = await this.getBalance(staker);
@@ -8799,8 +8815,8 @@ Wallet.prototype.stake = async function(staker, amount) {
     );
   }
 };
-Wallet.prototype.stakeInfo = async function(psk) {
-  const index = this.getPsks().indexOf(psk);
+Wallet.prototype.stakeInfo = async function(psk2) {
+  const index = this.getPsks().indexOf(psk2);
   if (index < 0) {
     throw new Error("Staker psk not found");
   }
@@ -8808,11 +8824,14 @@ Wallet.prototype.stakeInfo = async function(psk) {
   if (info.amount) {
     info["amount"] = duskToLux(this.wasm, info.amount);
   }
+  if (info.reward) {
+    info["reward"] = duskToLux(this.wasm, info.amount);
+  }
   return info;
 };
 Wallet.prototype.unstake = function(unstaker) {
   const index = this.getPsks().indexOf(unstaker);
-  if (!index) {
+  if (index === -1) {
     throw new Error("psk not found");
   }
   return unstake(
@@ -8851,8 +8870,8 @@ Wallet.prototype.stakeAllow = function(allowStakePsk, senderPsk) {
     );
   }
 };
-Wallet.prototype.withdrawReward = function(psk) {
-  const index = this.getPsks().indexOf(psk);
+Wallet.prototype.withdrawReward = function(psk2) {
+  const index = this.getPsks().indexOf(psk2);
   return withdrawReward(
     this.wasm,
     this.seed,
@@ -8861,8 +8880,8 @@ Wallet.prototype.withdrawReward = function(psk) {
     this.gasPrice
   );
 };
-Wallet.prototype.history = function(psk) {
-  return history(this.wasm, this.seed, psk);
+Wallet.prototype.history = function(psk2) {
+  return history(this.wasm, this.seed, psk2);
 };
 export {
   Wallet,
