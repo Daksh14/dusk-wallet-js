@@ -99,7 +99,7 @@ Wallet.prototype.stake = async function (staker, amount) {
     throw new Error(`Stake amount needs to be above a ${minStake} dusk`);
   }
 
-  if (!index) {
+  if (index === -1) {
     throw new Error("Staker psk not found");
   }
 
@@ -140,6 +140,10 @@ Wallet.prototype.stakeInfo = async function (psk) {
     info["amount"] = duskToLux(this.wasm, info.amount);
   }
 
+  if (info.reward) {
+    info["reward"] = duskToLux(this.wasm, info.reward);
+  }
+
   return info;
 };
 /**
@@ -150,7 +154,7 @@ Wallet.prototype.stakeInfo = async function (psk) {
 Wallet.prototype.unstake = function (unstaker) {
   const index = this.getPsks().indexOf(unstaker);
 
-  if (!index) {
+  if (index === -1) {
     throw new Error("psk not found");
   }
 
