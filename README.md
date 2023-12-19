@@ -65,7 +65,14 @@ Then go to [`127.0.0.1:8000/example/index.html`](http://127.0.0.1:8000/example/i
 [Check the github pages generated jsdoc](https://dusk-network.github.io/dusk-wallet-js/)
 
 # Testing
-Make sure you have the node running with the following genesis file
+
+## Docker
+
+```
+docker run --name rusk -p 9000:9000/udp -p 8080:8080/tcp -v ./genesis.toml:/opt/rusk/state.toml dusknetwork/node:latest
+```
+
+Make sure you have the node running with the following genesis.toml file for  `deno task test`
 
 ```toml
 [acl.stake]
