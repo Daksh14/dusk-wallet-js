@@ -88,6 +88,13 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   for await (const chunk of resp.body) {
     for (let i = 0; i < chunk.length; i += leafSize) {
       leaf = chunk.slice(i, i + leafSize);
+
+      if (!leaf || leaf.length == 0) {
+        console.warn("no leaf found from the node");
+
+        break;
+      }
+
       // get the tree leaf rkyv serialized
       const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
 

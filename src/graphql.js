@@ -45,7 +45,7 @@ export async function txStatus(txid, callback) {
 }
 
 /**
- * Check for tx hash in the blockchain every 1 seconds for 10 seconds
+ * Check for tx hash in the blockchain every 1 seconds for 30 seconds
  * @param {string} txHash the hash of the transaction to wait for
  * @returns {Promise} promise that resolves when the tx is accepted
  */
@@ -58,7 +58,7 @@ export function waitTillAccept(txHash) {
         i = i + 1;
 
         if (i > 30) {
-          reject("tx was not accepted in 10 seconds");
+          reject("tx was not accepted in 30 seconds");
         }
 
         const remoteTxStatus = status.tx;
