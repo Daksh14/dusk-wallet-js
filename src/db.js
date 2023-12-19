@@ -103,8 +103,13 @@ export async function getUnpsentNotes(psk) {
 
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
+    const result = await notes.toArray();
 
-    return notes.toArray();
+    if (!result) {
+      throw new Error("No unpsent notes found for the psk: " + psk);
+    }
+
+    return result;
   }
 }
 
@@ -127,6 +132,10 @@ export async function getSpentNotes(psk) {
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
+
+    if (!result) {
+      throw new Error("No spent notes found for the psk: " + psk);
+    }
 
     return result;
   }
@@ -182,7 +191,13 @@ export async function getAllNotes(psk) {
   const unspent = await unspentNotesTable.toArray();
   const spent = await spentNotesTable.toArray();
 
-  return spent.concat(unspent);
+  const concat = spent.concat(unspent);
+
+  if (!concat) {
+    throw new Error("No notes found for the psk: " + psk);
+  }
+
+  return concat;
 }
 
 /**
@@ -263,7 +278,13 @@ async function getAllUnpsentNotes() {
   const myTable = db.table("unspentNotes");
 
   if (myTable) {
-    return myTable.toArray();
+    const result = await myTable.toArray();
+
+    if (!result) {
+      throw new Error("No unspent notes found for the psk: " + psk);
+    }
+
+    return result;
   }
 }
 
