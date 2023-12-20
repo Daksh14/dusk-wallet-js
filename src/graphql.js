@@ -58,6 +58,7 @@ export function waitTillAccept(txHash) {
         i = i + 1;
 
         if (i > 30) {
+          clearInterval(interval);
           reject("tx was not accepted in 30 seconds");
         }
 

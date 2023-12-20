@@ -8013,15 +8013,21 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   const psks = [];
   const blockHeights = [];
   const positions = [];
+  let buffer = [];
   let lastPos = 0;
   for await (const chunk of resp.body) {
-    for (let i = 0; i < chunk.length; i += leafSize) {
-      leaf = chunk.slice(i, i + leafSize);
-      if (!leaf || leaf.length == 0) {
+    buffer.push(...chunk);
+    for (let i = 0; i < buffer.length; i += leafSize) {
+      const leaf2 = buffer.slice(i, i + leafSize);
+      buffer = buffer.slice(i + leafSize);
+      if (leaf2.length == 0) {
         console.warn("no leaf found from the node");
         break;
       }
-      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
+      if (leaf2.length !== leafSize) {
+        break;
+      }
+      const treeLeaf = getTreeLeafDeserialized(wasm, leaf2);
       const note = treeLeaf.note;
       const pos = treeLeaf.last_pos;
       const owned = checkIfOwned(wasm, seed, note);
@@ -8049,9 +8055,7 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   );
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
-  if (unspentNotes.length > 0 || spentNotes.length > 0) {
-    await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
-  }
+  await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
   return correctNotes(wasm);
 }
 function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFER_CONTRACT, targetType = "1") {
@@ -8130,20 +8134,26 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
     spentNotes: "pos,psk,nullifier"
   });
   try {
+    if (localStorage.getItem("lastPos") == null) {
+      console.log("Set last pos in local storage: " + pos);
+    }
     localStorage.setItem("lastPos", pos.toString());
-    console.log("Set last pos in local storage: " + pos);
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
   await db.unspentNotes.bulkPut(unspentNotes).then(() => {
-    console.log("Persisted unspent notes");
+    if (unspentNotes.length > 0) {
+      console.log("Persisted unspent notes");
+    }
   }).catch(function(e) {
     console.error(
       "Some insert operations did not while pushing unspent notes. " + e.failures.length + " failures"
     );
   });
   await db.spentNotes.bulkPut(spentNotes).then(() => {
-    console.log("Persisted spent notes");
+    if (spentNotes.length > 0) {
+      console.log("Persisted spent notes");
+    }
     db.close();
   }).catch(Dexie$1.BulkError, function(e) {
     console.error(
@@ -8328,6 +8338,7 @@ function waitTillAccept(txHash) {
         i = i + 1;
         if (i > 30) {
           reject("tx was not accepted in 30 seconds");
+          clearInterval(interval);
         }
         const remoteTxStatus = status.tx;
         if (remoteTxStatus) {
@@ -8408,6 +8419,9 @@ async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, 
     "rusk",
     "2"
   );
+  if (proofReq.status !== 200) {
+    throw new Error("Error while proving transaction, transaction failed");
+  }
   console.log("prove_execute status code: " + proofReq.status);
   const buffer = await proofReq.arrayBuffer();
   const bytes = new Uint8Array(buffer);
@@ -8825,7 +8839,7 @@ Wallet.prototype.stakeInfo = async function(psk2) {
     info["amount"] = duskToLux(this.wasm, info.amount);
   }
   if (info.reward) {
-    info["reward"] = duskToLux(this.wasm, info.amount);
+    info["reward"] = duskToLux(this.wasm, info.reward);
   }
   return info;
 };

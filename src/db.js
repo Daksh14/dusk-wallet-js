@@ -51,8 +51,11 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   });
 
   try {
+    if (localStorage.getItem("lastPos") == null) {
+      console.log("Set last pos in local storage: " + pos);
+    }
+
     localStorage.setItem("lastPos", pos.toString());
-    console.log("Set last pos in local storage: " + pos);
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
@@ -60,7 +63,9 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   await db.unspentNotes
     .bulkPut(unspentNotes)
     .then(() => {
-      console.log("Persisted unspent notes");
+      if (unspentNotes.length > 0) {
+        console.log("Persisted unspent notes");
+      }
     })
     .catch(function (e) {
       console.error(
@@ -73,7 +78,10 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   await db.spentNotes
     .bulkPut(spentNotes)
     .then(() => {
-      console.log("Persisted spent notes");
+      if (spentNotes.length > 0) {
+        console.log("Persisted spent notes");
+      }
+
       db.close();
     })
     .catch(Dexie.BulkError, function (e) {

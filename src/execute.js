@@ -104,6 +104,10 @@ export async function execute(
     "2"
   );
 
+  if (proofReq.status !== 200) {
+    throw new Error("Error while proving the transaction");
+  }
+
   console.log("prove_execute status code: " + proofReq.status);
 
   const buffer = await proofReq.arrayBuffer();
