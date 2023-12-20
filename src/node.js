@@ -83,15 +83,23 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const psks = [];
   const blockHeights = [];
   const positions = [];
+  let buffer = [];
   let lastPos = 0;
 
   for await (const chunk of resp.body) {
-    for (let i = 0; i < chunk.length; i += leafSize) {
-      leaf = chunk.slice(i, i + leafSize);
+    buffer.push(...chunk);
 
-      if (!leaf || leaf.length == 0) {
+    for (let i = 0; i < buffer.length; i += leafSize) {
+      const leaf = buffer.slice(i, i + leafSize);
+      buffer = buffer.slice(i + leafSize);
+
+      if (leaf.length == 0) {
         console.warn("no leaf found from the node");
 
+        break;
+      }
+
+      if (leaf.length !== leafSize) {
         break;
       }
 
@@ -134,10 +142,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
-  // if we have anything to insert then we insert
-  if (unspentNotes.length > 0 || spentNotes.length > 0) {
-    await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
-  }
+  await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
 
   return correctNotes(wasm);
 }
