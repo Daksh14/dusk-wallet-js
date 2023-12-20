@@ -17,7 +17,7 @@ import {
   stakeAllow,
   withdrawReward,
 } from "./contracts/stake.js";
-import { history, History } from "./history.js";
+import { history, TxData } from "./history.js";
 
 // Export mnemonic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
@@ -225,8 +225,18 @@ Wallet.prototype.withdrawReward = function (psk) {
  * Get the history of the wallet
  *
  * @param {string} psk - bs58 encoded public spend key of the user we want to fetch the history of
- * @returns {Array<History>} The history of the wallet
+ * @returns {Array<TxData>} The history of the wallet
  */
 Wallet.prototype.history = function (psk) {
   return history(this.wasm, this.seed, psk);
+};
+
+/**
+ * Reset the state indexedb db and localStorage
+ * @returns {Promise} promise that resolves after the db is reset
+ */
+Wallet.prototype.resetStorage = function () {
+  localStorage.removeItem("lastPos");
+
+  return Dexie.delete("state");
 };
