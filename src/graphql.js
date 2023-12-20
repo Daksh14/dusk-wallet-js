@@ -58,8 +58,8 @@ export function waitTillAccept(txHash) {
         i = i + 1;
 
         if (i > 30) {
-          reject("tx was not accepted in 30 seconds");
           clearInterval(interval);
+          reject("tx was not accepted in 30 seconds");
         }
 
         const remoteTxStatus = status.tx;
