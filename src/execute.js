@@ -105,7 +105,7 @@ export async function execute(
   );
 
   if (proofReq.status !== 200) {
-    throw new Error("Error while proving transaction, transaction failed");
+    throw new Error("Error while proving the transaction");
   }
 
   console.log("prove_execute status code: " + proofReq.status);

@@ -75,14 +75,15 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
     node
   );
 
-  // what an indivdual leaf would be
-  let leaf;
-  // The notes we get from the network which we own.
+  // The notes we get from the network which we might own or not
   const notes = [];
   const nullifiers = [];
   const psks = [];
   const blockHeights = [];
   const positions = [];
+
+  // contains the chunks of the response, at the end of each iteration
+  // it conatains the remaining bytes
   let buffer = [];
   let lastPos = 0;
 
