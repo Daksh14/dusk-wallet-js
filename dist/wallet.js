@@ -8007,7 +8007,6 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
     true,
     node
   );
-  let leaf;
   const notes = [];
   const nullifiers = [];
   const psks = [];
@@ -8018,16 +8017,16 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   for await (const chunk of resp.body) {
     buffer.push(...chunk);
     for (let i = 0; i < buffer.length; i += leafSize) {
-      const leaf2 = buffer.slice(i, i + leafSize);
+      const leaf = buffer.slice(i, i + leafSize);
       buffer = buffer.slice(i + leafSize);
-      if (leaf2.length == 0) {
+      if (leaf.length == 0) {
         console.warn("no leaf found from the node");
         break;
       }
-      if (leaf2.length !== leafSize) {
+      if (leaf.length !== leafSize) {
         break;
       }
-      const treeLeaf = getTreeLeafDeserialized(wasm, leaf2);
+      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
       const note = treeLeaf.note;
       const pos = treeLeaf.last_pos;
       const owned = checkIfOwned(wasm, seed, note);
@@ -8337,8 +8336,8 @@ function waitTillAccept(txHash) {
       await txStatus(txHash, (status) => {
         i = i + 1;
         if (i > 30) {
-          reject("tx was not accepted in 30 seconds");
           clearInterval(interval);
+          reject("tx was not accepted in 30 seconds");
         }
         const remoteTxStatus = status.tx;
         if (remoteTxStatus) {
@@ -8420,7 +8419,7 @@ async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, 
     "2"
   );
   if (proofReq.status !== 200) {
-    throw new Error("Error while proving transaction, transaction failed");
+    throw new Error("Error while proving the transaction");
   }
   console.log("prove_execute status code: " + proofReq.status);
   const buffer = await proofReq.arrayBuffer();
@@ -8896,6 +8895,10 @@ Wallet.prototype.withdrawReward = function(psk2) {
 };
 Wallet.prototype.history = function(psk2) {
   return history(this.wasm, this.seed, psk2);
+};
+Wallet.prototype.resetStorage = function() {
+  localStorage.removeItem("lastPos");
+  return Dexie$1.delete("state");
 };
 export {
   Wallet,

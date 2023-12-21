@@ -10,7 +10,7 @@ import { txFromBlock } from "./graphql.js";
 import { getPsks } from "./keys.js";
 
 /**
- * @class History
+ * @class TxData
  * @type {Object}
  * @property {number} amount The amount of the transaction
  * @property {number} block_height The block_height where the tx is
@@ -18,11 +18,12 @@ import { getPsks } from "./keys.js";
  * @property {number} fee The fee of the tx
  * @property {string} id The hash of the tx
  */
-export function History(amount, block_height, direction, fee, id) {
+export function TxData(amount, block_height, direction, fee, id) {
   this.amount = amount;
   this.block_height = block_height;
   this.direction = direction;
   this.fee = fee;
+  this.id = id;
 }
 
 /**
@@ -31,7 +32,7 @@ export function History(amount, block_height, direction, fee, id) {
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed
  * @param {string} psk The psk to get the history for
- * @returns {Array<History>} The history of the transactions
+ * @returns {Array<TxData>} The history of the transactions
  * @ignore Only called by the Wallet object prototype
  */
 export async function history(wasm, seed, psk) {
