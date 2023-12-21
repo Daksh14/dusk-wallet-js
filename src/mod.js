@@ -6,10 +6,10 @@
 
 import { getPsks } from "./keys.js";
 import { duskToLux } from "./crypto.js";
-import { getBalance, BalanceInfo } from "./balance.js";
+import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
 import { txStatus } from "./graphql.js";
-import { sync, stakeInfo, StakeInfo } from "./node.js";
+import { sync, stakeInfo } from "./node.js";
 import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import {
   stake,
@@ -17,7 +17,8 @@ import {
   stakeAllow,
   withdrawReward,
 } from "./contracts/stake.js";
-import { history, TxData } from "./history.js";
+import { history } from "./history.js";
+import { Dexie } from "../deps.js";
 
 // Export mnemonic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };

@@ -1,6 +1,6 @@
 import { Wallet } from "../dist/wallet.js"; // url_test.ts
 
-import { assert, assertEquals } from "../deps.js";
+import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
 
 const DEFAULT_SEED = [
   153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115, 19,
@@ -15,6 +15,8 @@ const exports = initWasm.instance.exports;
 
 const wallet = new Wallet(exports, DEFAULT_SEED);
 const psks = wallet.getPsks();
+
+Dexie.dependencies.indexedDB = indexedDB;
 
 // clear the Deno localstorage api to start fresh
 localStorage.clear();
@@ -239,6 +241,21 @@ Deno.test({
       assertEquals(parseInt(history[2].fee, 10), history[2].fee);
       assertEquals(history[2].id.length, 66);
     });
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "reset storage",
+  async fn() {
+    await wallet.resetStorage();
+
+    assertEquals(localStorage.getItem("lastPos"), null);
+
+    const exists = await Dexie.exists("state");
+
+    assert(!exists);
   },
   sanitizeResources: false,
   sanitizeOps: false,
