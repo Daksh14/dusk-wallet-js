@@ -17,7 +17,7 @@ import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
 // env variables
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
-const LOCAL_NODE = process.env.LOCAL_NODE;
+const NODE = process.env.CURRENT_NODE;
 
 /**
  *
@@ -58,7 +58,7 @@ export function StakeInfo(
  * @param {Uint8Array} seed The seed of the walconst
  * @returns {Promise} Promise that resolves when the sync is done
  */
-export async function sync(wasm, seed, node = LOCAL_NODE) {
+export async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
 
   // our last height where we start fetching from
@@ -152,7 +152,7 @@ export async function sync(wasm, seed, node = LOCAL_NODE) {
  * @param {Array<Uint8Array>} data Data that is sent with the request
  * @param {string} request_name Name of the request we are performing
  * @param {boolean} stream If you want the response streamed or not
- * @param {string} node Node address, by default LOCAL_NODe
+ * @param {string} node Node address, by default CURRENT_NODE
  * @param {string} target target address, by default transfer contract
  * @param {string} targetType the target number in string
  * @returns {Response} response Result of the fetch
@@ -161,7 +161,7 @@ export function request(
   data,
   request_name,
   stream,
-  node = LOCAL_NODE,
+  node = NODE,
   target = TRANSFER_CONTRACT,
   targetType = "1"
 ) {
@@ -199,7 +199,7 @@ export function request(
  * @param {string} node - Node address
  * @returns {Uint8Array} - Bytes of the UInt8Array
  */
-export async function fetchOpenings(pos, node = LOCAL_NODE) {
+export async function fetchOpenings(pos, node = NODE) {
   return responseBytes(await request(pos, "opening", false, node));
 }
 
