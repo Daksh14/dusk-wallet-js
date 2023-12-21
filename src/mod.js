@@ -236,7 +236,7 @@ Wallet.prototype.history = function (psk) {
  * Reset the state indexedb db and localStorage
  * @returns {Promise} promise that resolves after the db is reset
  */
-Wallet.prototype.resetStorage = function () {
+Wallet.prototype.reset = function () {
   localStorage.removeItem("lastPos");
 
   return Dexie.delete("state");

@@ -249,7 +249,7 @@ Deno.test({
 Deno.test({
   name: "reset storage",
   async fn() {
-    await wallet.resetStorage();
+    await wallet.reset();
 
     assertEquals(localStorage.getItem("lastPos"), null);
 
