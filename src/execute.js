@@ -16,6 +16,8 @@ import { getPsks } from "./keys.js";
 import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 import { waitTillAccept } from "./graphql.js";
 
+const PROVER = process.env.CURRENT_PROVER_NODE;
+
 /**
  * Call an arbitrary function on a smart contract
  *
@@ -99,7 +101,7 @@ export async function execute(
     varBytes,
     "prove_execute",
     false,
-    undefined,
+    PROVER,
     "rusk",
     "2"
   );
