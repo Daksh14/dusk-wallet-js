@@ -11,7 +11,11 @@ import {
   getTreeLeafDeserialized,
 } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
-import { insertSpentUnspentNotes, getLastPos, correctNotes } from "./db.js";
+import {
+  insertSpentUnspentNotes,
+  getLastPosIncremented,
+  correctNotes,
+} from "./db.js";
 import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
 
 // env variables
@@ -65,7 +69,7 @@ export async function sync(wasm, seed, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  const lastPosDB = await getLastPos();
+  const lastPosDB = getLastPosIncremented();
 
   // Get the leafs from the position above
   const resp = await request(
@@ -90,9 +94,10 @@ export async function sync(wasm, seed, node = NODE) {
   for await (const chunk of resp.body) {
     buffer.push(...chunk);
 
-    for (let i = 0; i < buffer.length; i += leafSize) {
+    let i;
+
+    for (i = 0; i < buffer.length; i += leafSize) {
       const leaf = buffer.slice(i, i + leafSize);
-      buffer = buffer.slice(i + leafSize);
 
       if (leaf.length == 0) {
         console.warn("no leaf found from the node");
@@ -122,6 +127,8 @@ export async function sync(wasm, seed, node = NODE) {
         psks.push(owned.public_spend_key);
       }
     }
+
+    buffer = buffer.slice(i + leafSize);
   }
 
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);

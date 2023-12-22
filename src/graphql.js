@@ -15,14 +15,7 @@ import { toBytes } from "./wasm.js";
 export async function graphQLRequest(query) {
   const bytes = toBytes(query);
 
-  const req = await request(
-    bytes,
-    "gql",
-    false,
-    process.env.LOCAL_NODE,
-    "Chain",
-    "2"
-  );
+  const req = await request(bytes, "gql", false, undefined, "Chain", "2");
 
   const buffer = await req.arrayBuffer();
   const response = new Uint8Array(buffer);
