@@ -7988,7 +7988,7 @@ function getOpeningsSerialized(wasm, bytes) {
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
-var LOCAL_NODE = "http://127.0.0.1:8080/";
+var NODE = "http://127.0.0.1:8080/";
 function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epoch) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -7998,9 +7998,10 @@ function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epo
   this.counter = counter;
   this.epoch = epoch;
 }
-async function sync(wasm, seed, node = LOCAL_NODE) {
+async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
-  const lastPosDB = await getLastPos();
+  const lastPosDB = getLastPosIncremented();
+  console.log(lastPosDB);
   const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
@@ -8016,9 +8017,9 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   let lastPos = 0;
   for await (const chunk of resp.body) {
     buffer.push(...chunk);
-    for (let i = 0; i < buffer.length; i += leafSize) {
+    let i;
+    for (i = 0; i < buffer.length; i += leafSize) {
       const leaf = buffer.slice(i, i + leafSize);
-      buffer = buffer.slice(i + leafSize);
       if (leaf.length == 0) {
         console.warn("no leaf found from the node");
         break;
@@ -8039,6 +8040,7 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
         psks.push(owned.public_spend_key);
       }
     }
+    buffer = buffer.slice(i + leafSize);
   }
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
   const existingNullifiersBytes = await responseBytes(
@@ -8057,7 +8059,7 @@ async function sync(wasm, seed, node = LOCAL_NODE) {
   await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
   return correctNotes(wasm);
 }
-function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFER_CONTRACT, targetType = "1") {
+function request(data, request_name, stream, node = NODE, target = TRANSFER_CONTRACT, targetType = "1") {
   const request_name_bytes = toBytes(request_name);
   const number = numberToLittleEndianByteArray(request_name.length);
   const length = number.length + request_name_bytes.length + data.length;
@@ -8078,7 +8080,7 @@ function request(data, request_name, stream, node = LOCAL_NODE, target = TRANSFE
     body: request2
   });
 }
-async function fetchOpenings(pos, node = LOCAL_NODE) {
+async function fetchOpenings(pos, node = NODE) {
   return responseBytes(await request(pos, "opening", false, node));
 }
 async function stakeInfo(wasm, seed, index) {
@@ -8136,7 +8138,7 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
     if (localStorage.getItem("lastPos") == null) {
       console.log("Set last pos in local storage: " + pos);
     }
-    localStorage.setItem("lastPos", pos.toString());
+    localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
@@ -8183,15 +8185,20 @@ function getLastPos() {
       return 0;
     } else {
       try {
-        return parseInt(lastPos) + 1;
+        return parseInt(lastPos);
       } catch (e) {
         console.error("Invalid lastPos set");
         localStorage.removeItem("lastPos");
+        return 0;
       }
     }
   } catch (e) {
     console.error("Cannot retrieve lastPos in local storage", e);
   }
+}
+function getLastPosIncremented() {
+  const pos = getLastPos();
+  return pos === 0 ? pos : pos + 1;
 }
 async function getAllNotes(psk2) {
   const dbHandle = new Dexie$1("state");
@@ -8309,14 +8316,7 @@ function proveTx(wasm, unprovenTx, proof) {
 // src/graphql.js
 async function graphQLRequest(query) {
   const bytes = toBytes(query);
-  const req = await request(
-    bytes,
-    "gql",
-    false,
-    "http://127.0.0.1:8080/",
-    "Chain",
-    "2"
-  );
+  const req = await request(bytes, "gql", false, void 0, "Chain", "2");
   const buffer = await req.arrayBuffer();
   const response = new Uint8Array(buffer);
   const json = JSON.parse(new TextDecoder().decode(response));
@@ -8370,6 +8370,7 @@ async function txFromBlock(block_height) {
 }
 
 // src/execute.js
+var PROVER = "http://127.0.0.1:8080/";
 async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, fee, gas_limit, gas_price) {
   const sender_index = getPsks(wasm, seed).indexOf(psk2);
   const notes = await getUnpsentNotes(psk2);
@@ -8407,6 +8408,7 @@ async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, 
     gas_limit,
     gas_price
   });
+  console.log(args);
   const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
   console.log("unrpovenTx length: " + unprovenTx.length);
   const varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
@@ -8414,7 +8416,7 @@ async function execute(wasm, seed, rng_seed, psk2, output, callData, crossover, 
     varBytes,
     "prove_execute",
     false,
-    void 0,
+    PROVER,
     "rusk",
     "2"
   );
@@ -8896,7 +8898,7 @@ Wallet.prototype.withdrawReward = function(psk2) {
 Wallet.prototype.history = function(psk2) {
   return history(this.wasm, this.seed, psk2);
 };
-Wallet.prototype.resetStorage = function() {
+Wallet.prototype.reset = function() {
   localStorage.removeItem("lastPos");
   return Dexie$1.delete("state");
 };

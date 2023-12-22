@@ -55,7 +55,7 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
       console.log("Set last pos in local storage: " + pos);
     }
 
-    localStorage.setItem("lastPos", pos.toString());
+    localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
@@ -165,15 +165,27 @@ export function getLastPos() {
     } else {
       try {
         // We wanna fetch from the +1 pos if there is an existing last position
-        return parseInt(lastPos) + 1;
+        return parseInt(lastPos);
       } catch (e) {
         console.error("Invalid lastPos set");
         localStorage.removeItem("lastPos");
+
+        return 0;
       }
     }
   } catch (e) {
     console.error("Cannot retrieve lastPos in local storage", e);
   }
+}
+
+/**
+ * Increment the lastPos by 1 if non zero
+ * @returns {number} lastPos the position where to fetch from
+ */
+export function getLastPosIncremented() {
+  const pos = getLastPos();
+
+  return pos === 0 ? pos : pos + 1;
 }
 
 /**
