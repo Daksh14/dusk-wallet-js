@@ -9576,7 +9576,7 @@ function getOpeningsSerialized(wasm, bytes) {
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
-var NODE = "https://nodes.dusk.network/";
+var NODE = "http://127.0.0.1:8080/";
 function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epoch) {
   this.has_key = has_key;
   this.has_staked = has_staked;
