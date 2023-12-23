@@ -4,11 +4,17 @@ import { oakCors } from "https://deno.land/x/cors/mod.ts";
 const app = new Application();
 
 // The domain for LOCAL_NODE for example purposes
-app.use(
-  oakCors({
-    origin: "http://127.0.0.1:8080",
-  })
-);
+app.use(oakCors({ origin: "*", optionsSuccessStatus: 200 }));
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "*"); // * for all servers, you can use your own server address
+  ctx.response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  ); // Which methods you want to allow
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type"); // If your request body has json
+  await next(); // If you use async await in other middlewares, you must use async await here
+});
 
 app.use(async (context, next) => {
   try {

@@ -8,6 +8,7 @@ import { getAllNotes } from "./db.js";
 import { call, jsonFromBytes } from "./wasm.js";
 import { txFromBlock } from "./graphql.js";
 import { getPsks } from "./keys.js";
+import { duskToLux } from "./crypto.js";
 
 /**
  * @class TxData
@@ -69,5 +70,9 @@ export async function history(wasm, seed, psk) {
 
   const result = jsonFromBytes(call(wasm, args, wasm.get_history));
 
-  return result.history;
+  return result.history.map((tx) => {
+    tx.fee = duskToLux(wasm, parseInt(tx.fee));
+
+    return tx;
+  });
 }

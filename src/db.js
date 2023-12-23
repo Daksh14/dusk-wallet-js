@@ -113,10 +113,6 @@ export async function getUnpsentNotes(psk) {
     const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
 
-    if (!result) {
-      throw new Error("No unpsent notes found for the psk: " + psk);
-    }
-
     return result;
   }
 }
@@ -140,10 +136,6 @@ export async function getSpentNotes(psk) {
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
-
-    if (!result) {
-      throw new Error("No spent notes found for the psk: " + psk);
-    }
 
     return result;
   }
@@ -198,7 +190,9 @@ export function getLastPosIncremented() {
 export async function getAllNotes(psk) {
   const dbHandle = new Dexie("state");
 
-  const db = await dbHandle.open();
+  const db = await dbHandle.open().catch((error) => {
+    console.error("Error while all notes: " + error);
+  });
 
   const unspentNotesTable = db
     .table("unspentNotes")
@@ -212,10 +206,6 @@ export async function getAllNotes(psk) {
   const spent = await spentNotesTable.toArray();
 
   const concat = spent.concat(unspent);
-
-  if (!concat) {
-    throw new Error("No notes found for the psk: " + psk);
-  }
 
   return concat;
 }
@@ -299,10 +289,6 @@ async function getAllUnpsentNotes() {
 
   if (myTable) {
     const result = await myTable.toArray();
-
-    if (!result) {
-      throw new Error("No unspent notes found for the psk: " + psk);
-    }
 
     return result;
   }
