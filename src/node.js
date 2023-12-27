@@ -10,13 +10,15 @@ import {
   getNullifiersRkyvSerialized,
   getTreeLeafDeserialized,
 } from "./rkyv.js";
-import { getPublicKeyRkyvSerialized } from "./keys.js";
+import { getPublicKeyRkyvSerialized, getPsks } from "./keys.js";
 import {
   insertSpentUnspentNotes,
   getLastPosIncremented,
   correctNotes,
+  validateCache,
 } from "./db.js";
 import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
+import { path } from "../deps.js";
 
 // env variables
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
@@ -64,6 +66,9 @@ export function StakeInfo(
  */
 export async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
+  const firstPsk = getPsks(wasm, seed)[0];
+
+  await validateCache(firstPsk);
 
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
@@ -88,15 +93,13 @@ export async function sync(wasm, seed, node = NODE) {
 
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
-  let buffer = [];
+  const buffer = [];
   let lastPos = 0;
 
   for await (const chunk of resp.body) {
     buffer.push(...chunk);
 
-    let i;
-
-    for (i = 0; i < buffer.length; i += leafSize) {
+    for (let i = 0; i < buffer.length; i += leafSize) {
       const leaf = buffer.slice(i, i + leafSize);
 
       if (leaf.length == 0) {
@@ -127,8 +130,6 @@ export async function sync(wasm, seed, node = NODE) {
         psks.push(owned.public_spend_key);
       }
     }
-
-    buffer = buffer.slice(i + leafSize);
   }
 
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
@@ -192,8 +193,9 @@ export function request(
     headers["Rusk-Feeder"] = "1";
   }
 
-  /// http://127.0.0.1:8080/ + 1/ + 00002 = http://127.0.0.1:8080/1/00002
-  return fetch(node + targetType + "/" + target, {
+  const url = new URL(path.join(targetType, target), node);
+
+  return fetch(url, {
     method: "POST",
     headers: headers,
     body: request,

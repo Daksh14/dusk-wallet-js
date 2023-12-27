@@ -12,6 +12,7 @@
  */
 function alloc(wasm, bytes) {
   const length = bytes.byteLength;
+
   try {
     const ptr = wasm.allocate(length);
     const mem = new Uint8Array(wasm.memory.buffer, ptr, length);
@@ -45,7 +46,7 @@ function getAndFree(wasm, result) {
  */
 function decompose(result) {
   const ptr = result >> 32n;
-  const len = ((result << 32n) & ((1n << 64n) - 1n)) >> 48n;
+  const len = ((result << 32n) & ((1n << 64n) - 1n)) >> 40n;
   const success = ((result << 63n) & ((1n << 64n) - 1n)) >> 63n == 0n;
 
   return {
@@ -72,6 +73,7 @@ export const toBytes = (string) => {
  */
 export function jsonFromBytes(bytes) {
   const string = new TextDecoder().decode(bytes);
+
   try {
     const jsonParsed = JSON.parse(string);
     return jsonParsed;
@@ -95,7 +97,9 @@ export function call(wasm, args, function_call) {
   const callResult = decompose(call);
 
   if (!callResult.status) {
-    console.error("Function call " + function_call + " failed!");
+    console.error(
+      "Function call " + function_call.name.toString() + " failed!"
+    );
   }
 
   const bytes = getAndFree(wasm, callResult);

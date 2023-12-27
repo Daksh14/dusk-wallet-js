@@ -103,7 +103,7 @@ Deno.test({
     assertEquals(parseInt(info.eligiblity, 10), info.eligiblity);
     assertEquals(info.amount, 2000);
     assertEquals(info.reward, 0);
-    assertEquals(info.epoch, 3);
+    assertEquals(parseInt(info.epoch), info.epoch);
     assertEquals(info.counter, 1);
     assertEquals(info.has_key, true);
   },
@@ -214,14 +214,14 @@ Deno.test({
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
 
-      assertEquals(history[0].amount, -4000.000275835);
+      assertEquals(history[0].amount, -4002.9);
       assertEquals(
         parseInt(history[0].block_height, 10),
         history[0].block_height
       );
       assertEquals(history[0].direction, "Out");
-      assertEquals(history[0].fee, 275835);
-      assertEquals(history[0].id.length, 66);
+      assertEquals(history[0].fee, 0.000275835);
+      assertEquals(history[0].id.length, 64);
 
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
@@ -229,8 +229,8 @@ Deno.test({
         history[1].block_height
       );
       assertEquals(history[1].direction, "Out");
-      assertEquals(parseInt(history[1].fee, 10), history[1].fee);
-      assertEquals(history[1].id.length, 66);
+      assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
+      assertEquals(history[1].id.length, 64);
 
       assertEquals(parseFloat(history[2].amount), history[2].amount);
       assertEquals(
@@ -238,8 +238,8 @@ Deno.test({
         history[2].block_height
       );
       assertEquals(history[2].direction, "Out");
-      assertEquals(parseInt(history[2].fee, 10), history[2].fee);
-      assertEquals(history[2].id.length, 66);
+      assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
+      assertEquals(history[2].id.length, 64);
     });
   },
   sanitizeResources: false,

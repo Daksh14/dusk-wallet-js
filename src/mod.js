@@ -18,7 +18,7 @@ import {
   withdrawReward,
 } from "./contracts/stake.js";
 import { history } from "./history.js";
-import { Dexie } from "../deps.js";
+import { clearDB } from "./db.js";
 
 // Export mnemonic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
@@ -237,7 +237,5 @@ Wallet.prototype.history = function (psk) {
  * @returns {Promise} promise that resolves after the db is reset
  */
 Wallet.prototype.reset = function () {
-  localStorage.removeItem("lastPos");
-
-  return Dexie.delete("state");
+  return clearDB();
 };

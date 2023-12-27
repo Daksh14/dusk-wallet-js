@@ -32,6 +32,17 @@ export function NoteData(note, psk, pos, nullifier, block_height) {
 }
 
 /**
+ * @class HistoryData
+ * @type {Object}
+ * @property {string} psk The bs58 encoded public spend key of the note
+ * @property {Array<TxData>} history the tx data
+ */
+export function HistoryData(psk, history) {
+  this.psk = psk;
+  this.history = history;
+}
+
+/**
  * Persist the state of unspent_notes and spent_notes in the indexedDB
  * This is called by the sync function
  *
@@ -41,15 +52,6 @@ export function NoteData(note, psk, pos, nullifier, block_height) {
  * @ignore Only called by the sync function
  */
 export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
-  const db = new Dexie("state");
-
-  db.version(1).stores({
-    // Added a autoincremented id for good practice
-    // if we need to index it in future
-    unspentNotes: "pos,psk,nullifier",
-    spentNotes: "pos,psk,nullifier",
-  });
-
   try {
     if (localStorage.getItem("lastPos") == null) {
       console.log("Set last pos in local storage: " + pos);
@@ -59,6 +61,8 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
+
+  const db = initializeState();
 
   await db.unspentNotes
     .bulkPut(unspentNotes)
@@ -101,21 +105,13 @@ export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
  * @ignore Only called by the sync function
  */
 export async function getUnpsentNotes(psk) {
-  const dbHandle = new Dexie("state");
-
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while getting unspent notes: " + error);
-  });
+  const db = initializeState();
 
   const myTable = db.table("unspentNotes");
 
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
-
-    if (!result) {
-      throw new Error("No unpsent notes found for the psk: " + psk);
-    }
 
     return result;
   }
@@ -129,21 +125,13 @@ export async function getUnpsentNotes(psk) {
  * @ignore Only called by the sync function
  */
 export async function getSpentNotes(psk) {
-  const dbHandle = new Dexie("state");
-
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while getting spent notes: " + error);
-  });
+  const db = initializeState();
 
   const myTable = db.table("spentNotes");
 
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
-
-    if (!result) {
-      throw new Error("No spent notes found for the psk: " + psk);
-    }
 
     return result;
   }
@@ -196,9 +184,7 @@ export function getLastPosIncremented() {
  * @ignore Only called by the sync function
  */
 export async function getAllNotes(psk) {
-  const dbHandle = new Dexie("state");
-
-  const db = await dbHandle.open();
+  const db = initializeState();
 
   const unspentNotesTable = db
     .table("unspentNotes")
@@ -212,10 +198,6 @@ export async function getAllNotes(psk) {
   const spent = await spentNotesTable.toArray();
 
   const concat = spent.concat(unspent);
-
-  if (!concat) {
-    throw new Error("No notes found for the psk: " + psk);
-  }
 
   return concat;
 }
@@ -284,25 +266,97 @@ export async function correctNotes(wasm) {
 }
 
 /**
+ * Insert history data
+ * @param {HistoryData} historyData
+ */
+export async function insertHistory(historyData) {
+  const db = initializeHistory();
+
+  const existingHistory = await getHistory(historyData.psk);
+
+  // remove duplicates
+  historyData.history = existingHistory.history
+    .concat(historyData.history)
+    .filter(
+      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
+    );
+
+  await db.cache
+    .put(historyData)
+    .then(() => {
+      if (historyData.history.length > 0) {
+        console.log("Persisted history data");
+      }
+    })
+    .catch(function (e) {
+      console.error(
+        "Some insert operations did not while pushing history data. " + e
+      );
+    });
+}
+
+/**
+ *
+ * @param {string} psk
+ * @returns {HistoryData}
+ */
+export async function getHistory(psk) {
+  const db = initializeHistory();
+
+  const historyData = (await db.cache.get(psk)) ?? new HistoryData(psk, []);
+
+  return historyData;
+}
+
+/**
+ * Clears all localstorage inserts and IndexedDB inserts
+ */
+export async function clearDB() {
+  localStorage.removeItem("lastPos");
+  localStorage.removeItem("lastPsk");
+
+  await Dexie.delete("history");
+
+  console.log("clearing");
+
+  return Dexie.delete("state");
+}
+
+/**
+ * Check if the cache is valid given the psk
+ * If the psk is different then clear the db
+ *
+ * @param {string} psk
+ */
+export async function validateCache(psk) {
+  try {
+    const lastPsk = localStorage.getItem("lastPsk");
+
+    if (lastPsk && lastPsk != "undefined") {
+      if (lastPsk != psk) {
+        console.log("Cache invalidation, clearing db");
+        await clearDB();
+      }
+    }
+
+    localStorage.setItem("lastPsk", psk);
+  } catch (e) {
+    console.error("Cannot retrieve lastPsk in local storage", e);
+  }
+}
+
+/**
  * Fetch all unspent notes from the IndexedDB if there are any
  * @returns {Promise<Array<NoteData>>} unspent notes of the psk
  * @ignore Only called by the sync function
  */
 async function getAllUnpsentNotes() {
-  const dbHandle = new Dexie("state");
-
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while getting all unspent notes: " + error);
-  });
+  const db = initializeState();
 
   const myTable = db.table("unspentNotes");
 
   if (myTable) {
     const result = await myTable.toArray();
-
-    if (!result) {
-      throw new Error("No unspent notes found for the psk: " + psk);
-    }
 
     return result;
   }
@@ -317,15 +371,7 @@ async function getAllUnpsentNotes() {
  * @ignore Only called by the sync function
  */
 async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
-  const dbHandle = new Dexie("state");
-
-  const db = await dbHandle.open().catch(Dexie.BulkError, function (e) {
-    console.error(
-      "Some insert operations did not while deleting unspent notes. " +
-        e.failures.length +
-        " failures"
-    );
-  });
+  const db = initializeState();
 
   const unspentNotesTable = db.table("unspentNotes");
   if (unspentNotesTable) {
@@ -337,4 +383,27 @@ async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
   if (spentNotesTable) {
     return spentNotesTable.bulkPut(spentNotes);
   }
+}
+
+function initializeState() {
+  const db = new Dexie("state");
+
+  db.version(1).stores({
+    // Added a autoincremented id for good practice
+    // if we need to index it in future
+    unspentNotes: "pos,psk,nullifier",
+    spentNotes: "pos,psk,nullifier",
+  });
+
+  return db;
+}
+
+function initializeHistory() {
+  const db = new Dexie("history");
+
+  db.version(1).stores({
+    cache: "&psk",
+  });
+
+  return db;
 }

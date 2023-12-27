@@ -9,5 +9,6 @@ import {
   assertEquals,
   assert,
 } from "https://deno.land/std@0.207.0/assert/mod.ts";
+import * as path from "https://deno.land/std@0.102.0/path/mod.ts";
 
-export { Dexie, indexedDB, assertEquals, assert };
+export { Dexie, indexedDB, assertEquals, assert, path };

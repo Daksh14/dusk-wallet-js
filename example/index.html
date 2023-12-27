@@ -5,6 +5,18 @@
   <body>
     <div><p>Well this is awkward</p></div>
     <script type="module">
+      ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+        const reader = this.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      };
       import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
       // Default wallet seed
       const seed = [
@@ -35,34 +47,23 @@
       const initWasm = async () => {
         fetch("../assets/dusk-wallet-core-0.21.0.wasm")
           .then((response) => response.arrayBuffer())
-          .then((buffer) => WebAssembly.instantiate(buffer))
+          .then((buffer) => WebAssembly.instantiate(buffer, imports))
           .then(async (result) => {
             console.log("wasm loaded!: ", result);
             const exports = result.instance.exports;
             memory = exports.memory;
 
             let wallet = new Wallet(exports, seed);
+            let psks = wallet.getPsks();
+            console.log(psks);
+
+            // console.log(getTreeLeafDeserialized(exports, leaf));
 
             let sync = await wallet.sync();
-            let psks = wallet.getPsks();
 
-            // wallet.getBalance(psks[0], (bal) => {
-            //   console.log(bal.value);
-            // });
+            console.log(await wallet.history(psks[0]));
 
-            // wallet.getBalance(psks[2], (bal) => {
-            //   console.log(bal.value);
-            // });
-
-            // wallet.transfer(psks[0], psks[2], 4000);
-            // wallet.stake(psks[2], 2000);
-            // wallet.unstake(psks[2]);
-            // await wallet.stakeAllow(psks[2]);
-            // console.log(await wallet.stakeInfo(psks[2]));
-            // wallet.withdrawReward(psks[0]);
-            // await wallet.history(psks[1], (history) => {
-            //   console.log(history);
-            // });
+            // await wallet.transfer(psks[0], psks[1], 193);
           })
           .catch((err) =>
             setTimeout(() => {
