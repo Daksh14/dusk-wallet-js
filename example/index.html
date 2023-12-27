@@ -17,18 +17,14 @@
           reader.releaseLock();
         }
       };
-      import {
-        Wallet,
-        generateRandomMnemonic,
-        getTreeLeafDeserialized,
-      } from "../dist/wallet.js";
+      import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
       // Default wallet seed
       const seed = [
-        219, 97, 4, 38, 84, 132, 220, 244, 238, 137, 105, 215, 12, 127, 226,
-        151, 123, 180, 220, 255, 193, 65, 242, 254, 127, 208, 56, 72, 145, 142,
-        74, 86, 122, 62, 47, 108, 25, 154, 50, 13, 127, 140, 154, 156, 137, 46,
-        150, 210, 32, 152, 152, 242, 214, 140, 209, 190, 33, 69, 234, 202, 8,
-        39, 64, 7,
+        153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115,
+        19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168,
+        214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55,
+        172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117,
+        221, 221,
       ];
 
       let memory;
@@ -59,6 +55,7 @@
 
             let wallet = new Wallet(exports, seed);
             let psks = wallet.getPsks();
+            console.log(psks);
 
             // console.log(getTreeLeafDeserialized(exports, leaf));
 

@@ -9578,7 +9578,7 @@ function getOpeningsSerialized(wasm, bytes) {
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
-var NODE = "https://nodes.dusk.network";
+var NODE = "http://127.0.0.1:8080/";
 function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epoch) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -9996,7 +9996,7 @@ async function txFromBlock(block_height) {
 }
 
 // src/execute.js
-var PROVER = "https://provers.dusk.network";
+var PROVER = "http://127.0.0.1:8080/";
 async function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, gas_limit, gas_price) {
   const sender_index = getPsks(wasm, seed).indexOf(psk);
   const notes = await getUnpsentNotes(psk);
@@ -10383,7 +10383,6 @@ async function history(wasm, seed, psk) {
     )
   );
   const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
-  console.log(lastInsertedBlockHeight, noteBlockHeights);
   if (lastInsertedBlockHeight >= noteBlockHeights) {
     return histData;
   }
@@ -10554,7 +10553,6 @@ export {
   Wallet,
   generateRandomMnemonic,
   getSeedFromMnemonic,
-  getTreeLeafDeserialized,
   txStatus
 };
 /*! *****************************************************************************

@@ -6,7 +6,7 @@ const DEFAULT_SEED = [
   153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115, 19,
   81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168, 214, 242,
   68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55, 172, 27, 255, 184,
-  55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117, 221, 22,
+  55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117, 221, 221,
 ];
 
 const wasm = await Deno.readFile("./assets/dusk-wallet-core-0.21.0.wasm");
@@ -214,7 +214,7 @@ Deno.test({
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
 
-      assertEquals(history[0].amount, -4000.000275835);
+      assertEquals(history[0].amount, -4002.9);
       assertEquals(
         parseInt(history[0].block_height, 10),
         history[0].block_height
