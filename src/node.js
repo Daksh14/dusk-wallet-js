@@ -10,12 +10,11 @@ import {
   getNullifiersRkyvSerialized,
   getTreeLeafDeserialized,
 } from "./rkyv.js";
-import { getPublicKeyRkyvSerialized, getPsks } from "./keys.js";
+import { getPublicKeyRkyvSerialized } from "./keys.js";
 import {
   insertSpentUnspentNotes,
   getLastPosIncremented,
   correctNotes,
-  validateCache,
 } from "./db.js";
 import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
