@@ -66,10 +66,6 @@ export function StakeInfo(
  */
 export async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
-  const firstPsk = getPsks(wasm, seed)[0];
-
-  await validateCache(firstPsk);
-
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
