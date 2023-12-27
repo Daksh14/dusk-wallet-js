@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { getAllNotes } from "./db.js";
+import { getAllNotes, insertHistory, getHistory } from "./db.js";
 import { call, jsonFromBytes } from "./wasm.js";
 import { txFromBlock } from "./graphql.js";
 import { getPsks } from "./keys.js";
@@ -37,7 +37,29 @@ export function TxData(amount, block_height, direction, fee, id) {
  * @ignore Only called by the Wallet object prototype
  */
 export async function history(wasm, seed, psk) {
-  const notes = await getAllNotes(psk);
+  let histData = await getHistory(psk);
+
+  const lastInsertedBlockHeight = histData.lastBlockHeight;
+
+  histData = histData.history;
+
+  let notes = await getAllNotes(psk);
+
+  // Remove duplicate block heights, complexity is O(n^2) but n should be too large and we
+  // save sending lots of http requests
+  notes = Array.from(
+    notes.filter(
+      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
+    )
+  );
+
+  const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
+
+  console.log(lastInsertedBlockHeight, noteBlockHeights);
+
+  if (lastInsertedBlockHeight >= noteBlockHeights) {
+    return histData;
+  }
 
   const txData = [];
   const noteData = [];
@@ -69,10 +91,21 @@ export async function history(wasm, seed, psk) {
   });
 
   const result = jsonFromBytes(call(wasm, args, wasm.get_history));
-
-  return result.history.map((tx) => {
+  const history = result.history.map((tx) => {
     tx.fee = duskToLux(wasm, parseInt(tx.fee));
 
     return tx;
   });
+
+  const lastBlocKHeight = Math.max(...histData.map((tx) => tx.block_height));
+
+  const historyData = {
+    psk: psk,
+    history: history,
+    lastBlockHeight: lastBlocKHeight,
+  };
+
+  await insertHistory(historyData);
+
+  return history;
 }

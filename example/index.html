@@ -5,14 +5,30 @@
   <body>
     <div><p>Well this is awkward</p></div>
     <script type="module">
-      import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
+      ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+        const reader = this.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      };
+      import {
+        Wallet,
+        generateRandomMnemonic,
+        getTreeLeafDeserialized,
+      } from "../dist/wallet.js";
       // Default wallet seed
       const seed = [
-        153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115,
-        19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168,
-        214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55,
-        172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117,
-        221, 221,
+        219, 97, 4, 38, 84, 132, 220, 244, 238, 137, 105, 215, 12, 127, 226,
+        151, 123, 180, 220, 255, 193, 65, 242, 254, 127, 208, 56, 72, 145, 142,
+        74, 86, 122, 62, 47, 108, 25, 154, 50, 13, 127, 140, 154, 156, 137, 46,
+        150, 210, 32, 152, 152, 242, 214, 140, 209, 190, 33, 69, 234, 202, 8,
+        39, 64, 7,
       ];
 
       let memory;
@@ -35,34 +51,22 @@
       const initWasm = async () => {
         fetch("../assets/dusk-wallet-core-0.21.0.wasm")
           .then((response) => response.arrayBuffer())
-          .then((buffer) => WebAssembly.instantiate(buffer))
+          .then((buffer) => WebAssembly.instantiate(buffer, imports))
           .then(async (result) => {
             console.log("wasm loaded!: ", result);
             const exports = result.instance.exports;
             memory = exports.memory;
 
             let wallet = new Wallet(exports, seed);
-
-            let sync = await wallet.sync();
             let psks = wallet.getPsks();
 
-            // wallet.getBalance(psks[0], (bal) => {
-            //   console.log(bal.value);
-            // });
+            // console.log(getTreeLeafDeserialized(exports, leaf));
 
-            // wallet.getBalance(psks[2], (bal) => {
-            //   console.log(bal.value);
-            // });
+            let sync = await wallet.sync();
 
-            // wallet.transfer(psks[0], psks[2], 4000);
-            // wallet.stake(psks[2], 2000);
-            // wallet.unstake(psks[2]);
-            // await wallet.stakeAllow(psks[2]);
-            // console.log(await wallet.stakeInfo(psks[2]));
-            // wallet.withdrawReward(psks[0]);
-            // await wallet.history(psks[1], (history) => {
-            //   console.log(history);
-            // });
+            console.log(await wallet.history(psks[0]));
+
+            // await wallet.transfer(psks[0], psks[1], 193);
           })
           .catch((err) =>
             setTimeout(() => {

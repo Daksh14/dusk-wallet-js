@@ -27,7 +27,7 @@ function getAndFree(wasm, result) {
 }
 function decompose(result) {
   const ptr = result >> 32n;
-  const len = (result << 32n & (1n << 64n) - 1n) >> 48n;
+  const len = (result << 32n & (1n << 64n) - 1n) >> 40n;
   const success = (result << 63n & (1n << 64n) - 1n) >> 63n == 0n;
   return {
     ptr: Number(ptr.toString()),
@@ -55,7 +55,9 @@ function call(wasm, args, function_call) {
   const call2 = function_call(ptr, argBytes.byteLength);
   const callResult = decompose(call2);
   if (!callResult.status) {
-    console.error("Function call " + function_call + " failed!");
+    console.error(
+      "Function call " + function_call.name.toString() + " failed!"
+    );
   }
   const bytes = getAndFree(wasm, callResult);
   return bytes;
@@ -9576,7 +9578,7 @@ function getOpeningsSerialized(wasm, bytes) {
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
-var NODE = "http://127.0.0.1:8080/";
+var NODE = "https://nodes.dusk.network";
 function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epoch) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -9588,6 +9590,8 @@ function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epo
 }
 async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
+  const firstPsk = getPsks(wasm, seed)[0];
+  await validateCache(firstPsk);
   const lastPosDB = getLastPosIncremented();
   const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
@@ -9600,12 +9604,11 @@ async function sync(wasm, seed, node = NODE) {
   const psks = [];
   const blockHeights = [];
   const positions = [];
-  let buffer = [];
+  const buffer = [];
   let lastPos = 0;
   for await (const chunk of resp.body) {
     buffer.push(...chunk);
-    let i;
-    for (i = 0; i < buffer.length; i += leafSize) {
+    for (let i = 0; i < buffer.length; i += leafSize) {
       const leaf = buffer.slice(i, i + leafSize);
       if (leaf.length == 0) {
         console.warn("no leaf found from the node");
@@ -9627,7 +9630,6 @@ async function sync(wasm, seed, node = NODE) {
         psks.push(owned.public_spend_key);
       }
     }
-    buffer = buffer.slice(i + leafSize);
   }
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
   const existingNullifiersBytes = await responseBytes(
@@ -9714,14 +9716,11 @@ function numberToLittleEndianByteArray(num) {
 if (globalThis.indexedDB === void 0) {
   Dexie$1.dependencies.indexedDB = fakeIndexedDB_default;
 }
+function HistoryData(psk, history2) {
+  this.psk = psk;
+  this.history = history2;
+}
 async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
-  const db = new Dexie$1("state");
-  db.version(1).stores({
-    // Added a autoincremented id for good practice
-    // if we need to index it in future
-    unspentNotes: "pos,psk,nullifier",
-    spentNotes: "pos,psk,nullifier"
-  });
   try {
     if (localStorage.getItem("lastPos") == null) {
       console.log("Set last pos in local storage: " + pos);
@@ -9730,6 +9729,7 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   } catch (e) {
     console.error("Cannot set pos in local storage, the wallet will be slow");
   }
+  const db = initializeState();
   await db.unspentNotes.bulkPut(unspentNotes).then(() => {
     if (unspentNotes.length > 0) {
       console.log("Persisted unspent notes");
@@ -9751,10 +9751,7 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   });
 }
 async function getUnpsentNotes(psk) {
-  const dbHandle = new Dexie$1("state");
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while getting unspent notes: " + error);
-  });
+  const db = initializeState();
   const myTable = db.table("unspentNotes");
   if (myTable) {
     const notes = myTable.filter((note) => note.psk == psk);
@@ -9786,10 +9783,7 @@ function getLastPosIncremented() {
   return pos === 0 ? pos : pos + 1;
 }
 async function getAllNotes(psk) {
-  const dbHandle = new Dexie$1("state");
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while all notes: " + error);
-  });
+  const db = initializeState();
   const unspentNotesTable = db.table("unspentNotes").filter((note) => note.psk == psk);
   const spentNotesTable = db.table("spentNotes").filter((note) => note.psk == psk);
   const unspent = await unspentNotesTable.toArray();
@@ -9834,11 +9828,50 @@ async function correctNotes(wasm) {
   const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
   return deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
 }
-async function getAllUnpsentNotes() {
-  const dbHandle = new Dexie$1("state");
-  const db = await dbHandle.open().catch((error) => {
-    console.error("Error while getting all unspent notes: " + error);
+async function insertHistory(historyData) {
+  const db = initializeHistory();
+  const existingHistory = await getHistory(historyData.psk);
+  historyData.history = existingHistory.history.concat(historyData.history).filter(
+    (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
+  );
+  await db.cache.put(historyData).then(() => {
+    if (historyData.history.length > 0) {
+      console.log("Persisted history data");
+    }
+  }).catch(function(e) {
+    console.error(
+      "Some insert operations did not while pushing history data. " + e
+    );
   });
+}
+async function getHistory(psk) {
+  const db = initializeHistory();
+  const historyData = await db.cache.get(psk) ?? new HistoryData(psk, []);
+  return historyData;
+}
+async function clearDB() {
+  localStorage.removeItem("lastPos");
+  localStorage.removeItem("lastPsk");
+  await Dexie$1.delete("history");
+  console.log("clearing");
+  return Dexie$1.delete("state");
+}
+async function validateCache(psk) {
+  try {
+    const lastPsk = localStorage.getItem("lastPsk");
+    if (lastPsk && lastPsk != "undefined") {
+      if (lastPsk != psk) {
+        console.log("Cache invalidation, clearing db");
+        await clearDB();
+      }
+    }
+    localStorage.setItem("lastPsk", psk);
+  } catch (e) {
+    console.error("Cannot retrieve lastPsk in local storage", e);
+  }
+}
+async function getAllUnpsentNotes() {
+  const db = initializeState();
   const myTable = db.table("unspentNotes");
   if (myTable) {
     const result = await myTable.toArray();
@@ -9846,12 +9879,7 @@ async function getAllUnpsentNotes() {
   }
 }
 async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
-  const dbHandle = new Dexie$1("state");
-  const db = await dbHandle.open().catch(Dexie$1.BulkError, function(e) {
-    console.error(
-      "Some insert operations did not while deleting unspent notes. " + e.failures.length + " failures"
-    );
-  });
+  const db = initializeState();
   const unspentNotesTable = db.table("unspentNotes");
   if (unspentNotesTable) {
     await unspentNotesTable.bulkDelete(unspentNotesPos);
@@ -9860,6 +9888,23 @@ async function deleteUnspentNotesInsertSpentNotes(unspentNotesPos, spentNotes) {
   if (spentNotesTable) {
     return spentNotesTable.bulkPut(spentNotes);
   }
+}
+function initializeState() {
+  const db = new Dexie$1("state");
+  db.version(1).stores({
+    // Added a autoincremented id for good practice
+    // if we need to index it in future
+    unspentNotes: "pos,psk,nullifier",
+    spentNotes: "pos,psk,nullifier"
+  });
+  return db;
+}
+function initializeHistory() {
+  const db = new Dexie$1("history");
+  db.version(1).stores({
+    cache: "&psk"
+  });
+  return db;
 }
 
 // src/balance.js
@@ -9951,7 +9996,7 @@ async function txFromBlock(block_height) {
 }
 
 // src/execute.js
-var PROVER = "http://127.0.0.1:8080/";
+var PROVER = "https://provers.dusk.network";
 async function execute(wasm, seed, rng_seed, psk, output, callData, crossover, fee, gas_limit, gas_price) {
   const sender_index = getPsks(wasm, seed).indexOf(psk);
   const notes = await getUnpsentNotes(psk);
@@ -10328,7 +10373,20 @@ async function withdrawReward(wasm, seed, staker_index, gasLimit, gasPrice) {
 
 // src/history.js
 async function history(wasm, seed, psk) {
-  const notes = await getAllNotes(psk);
+  let histData = await getHistory(psk);
+  const lastInsertedBlockHeight = histData.lastBlockHeight;
+  histData = histData.history;
+  let notes = await getAllNotes(psk);
+  notes = Array.from(
+    notes.filter(
+      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
+    )
+  );
+  const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
+  console.log(lastInsertedBlockHeight, noteBlockHeights);
+  if (lastInsertedBlockHeight >= noteBlockHeights) {
+    return histData;
+  }
   const txData = [];
   const noteData = [];
   const index = getPsks(wasm, seed).indexOf(psk);
@@ -10354,10 +10412,18 @@ async function history(wasm, seed, psk) {
     tx_data: txData
   });
   const result = jsonFromBytes(call(wasm, args, wasm.get_history));
-  return result.history.map((tx) => {
+  const history2 = result.history.map((tx) => {
     tx.fee = duskToLux(wasm, parseInt(tx.fee));
     return tx;
   });
+  const lastBlocKHeight = Math.max(...histData.map((tx) => tx.block_height));
+  const historyData = {
+    psk,
+    history: history2,
+    lastBlockHeight: lastBlocKHeight
+  };
+  await insertHistory(historyData);
+  return history2;
 }
 
 // src/mod.js
@@ -10482,13 +10548,13 @@ Wallet.prototype.history = function(psk) {
   return history(this.wasm, this.seed, psk);
 };
 Wallet.prototype.reset = function() {
-  localStorage.removeItem("lastPos");
-  return Dexie$1.delete("state");
+  return clearDB();
 };
 export {
   Wallet,
   generateRandomMnemonic,
   getSeedFromMnemonic,
+  getTreeLeafDeserialized,
   txStatus
 };
 /*! *****************************************************************************
