@@ -323,29 +323,6 @@ export async function clearDB() {
 }
 
 /**
- * Check if the cache is valid given the psk
- * If the psk is different then clear the db
- *
- * @param {string} psk
- */
-export async function validateCache(psk) {
-  try {
-    const lastPsk = localStorage.getItem("lastPsk");
-
-    if (lastPsk && lastPsk != "undefined") {
-      if (lastPsk != psk) {
-        console.log("Cache invalidation, clearing db");
-        await clearDB();
-      }
-    }
-
-    localStorage.setItem("lastPsk", psk);
-  } catch (e) {
-    console.error("Cannot retrieve lastPsk in local storage", e);
-  }
-}
-
-/**
  * Fetch all unspent notes from the IndexedDB if there are any
  * @returns {Promise<Array<NoteData>>} unspent notes of the psk
  * @ignore Only called by the sync function
