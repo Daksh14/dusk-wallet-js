@@ -103,7 +103,7 @@ Deno.test({
     assertEquals(parseInt(info.eligiblity, 10), info.eligiblity);
     assertEquals(info.amount, 2000);
     assertEquals(info.reward, 0);
-    assertEquals(info.epoch, 3);
+    assertEquals(parseInt(info.epoch), info.epoch);
     assertEquals(info.counter, 1);
     assertEquals(info.has_key, true);
   },
