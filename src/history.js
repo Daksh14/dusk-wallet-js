@@ -43,15 +43,7 @@ export async function history(wasm, seed, psk) {
 
   histData = histData.history;
 
-  let notes = await getAllNotes(psk);
-
-  // Remove duplicate block heights, complexity is O(n^2) but n should be too large and we
-  // save sending lots of http requests
-  notes = Array.from(
-    notes.filter(
-      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
-    )
-  );
+  const notes = await getAllNotes(psk);
 
   const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
 
