@@ -214,7 +214,7 @@ Deno.test({
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
 
-      assertEquals(history[0].amount, -4002.9);
+      assertEquals(history[0].amount, -4000.000275835);
       assertEquals(
         parseInt(history[0].block_height, 10),
         history[0].block_height

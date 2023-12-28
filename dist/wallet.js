@@ -9590,8 +9590,6 @@ function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epo
 }
 async function sync(wasm, seed, node = NODE) {
   const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
-  const firstPsk = getPsks(wasm, seed)[0];
-  await validateCache(firstPsk);
   const lastPosDB = getLastPosIncremented();
   const resp = await request(
     getU64RkyvSerialized(wasm, lastPosDB),
@@ -9855,20 +9853,6 @@ async function clearDB() {
   await Dexie$1.delete("history");
   console.log("clearing");
   return Dexie$1.delete("state");
-}
-async function validateCache(psk) {
-  try {
-    const lastPsk = localStorage.getItem("lastPsk");
-    if (lastPsk && lastPsk != "undefined") {
-      if (lastPsk != psk) {
-        console.log("Cache invalidation, clearing db");
-        await clearDB();
-      }
-    }
-    localStorage.setItem("lastPsk", psk);
-  } catch (e) {
-    console.error("Cannot retrieve lastPsk in local storage", e);
-  }
 }
 async function getAllUnpsentNotes() {
   const db = initializeState();
@@ -10376,12 +10360,7 @@ async function history(wasm, seed, psk) {
   let histData = await getHistory(psk);
   const lastInsertedBlockHeight = histData.lastBlockHeight;
   histData = histData.history;
-  let notes = await getAllNotes(psk);
-  notes = Array.from(
-    notes.filter(
-      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
-    )
-  );
+  const notes = await getAllNotes(psk);
   const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
   if (lastInsertedBlockHeight >= noteBlockHeights) {
     return histData;
