@@ -10,6 +10,8 @@ import { request, stakeInfo } from "../node.js";
 import { execute } from "../execute.js";
 import { getPsks } from "../keys.js";
 
+const PROVER = process.env.CURRENT_PROVER_NODE;
+
 /**
  *
  * @param {WebAssembly.Exports} wasm
@@ -74,7 +76,7 @@ export async function stake(
     stctProofBytes,
     "prove_stct",
     false,
-    undefined,
+    PROVER,
     "rusk",
     "2"
   );
@@ -184,7 +186,7 @@ export async function unstake(
     wfctProofBytes,
     "prove_wfct",
     false,
-    undefined,
+    PROVER,
     "rusk",
     "2"
   );
