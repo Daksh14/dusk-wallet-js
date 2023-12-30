@@ -222,6 +222,7 @@ Deno.test({
       assertEquals(history[0].direction, "Out");
       assertEquals(history[0].fee, 0.000275835);
       assertEquals(history[0].id.length, 64);
+      assertEquals(history[0].tx_type, "TRANSFER");
 
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
@@ -231,6 +232,7 @@ Deno.test({
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
       assertEquals(history[1].id.length, 64);
+      assertEquals(new String(history[1].tx_type), history[1].tx_type);
 
       assertEquals(parseFloat(history[2].amount), history[2].amount);
       assertEquals(
@@ -240,6 +242,7 @@ Deno.test({
       assertEquals(history[2].direction, "Out");
       assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
       assertEquals(history[2].id.length, 64);
+      assertEquals(new String(history[1].tx_type), history[1].tx_type);
     });
   },
   sanitizeResources: false,

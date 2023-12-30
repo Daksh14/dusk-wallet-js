@@ -18,13 +18,15 @@ import { duskToLux } from "./crypto.js";
  * @property {string} direction The direction of the tx "In" or "Out"
  * @property {number} fee The fee of the tx
  * @property {string} id The hash of the tx
+ * @property {string} type The type of the tx
  */
-export function TxData(amount, block_height, direction, fee, id) {
+export function TxData(amount, block_height, direction, fee, id, type) {
   this.amount = amount;
   this.block_height = block_height;
   this.direction = direction;
   this.fee = fee;
   this.id = id;
+  this.type = type;
 }
 
 /**
