@@ -232,7 +232,7 @@ Deno.test({
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
       assertEquals(history[1].id.length, 64);
-      assert(history[1].type == "WITHDRAW" || history[1].type == "ALLOW");
+      assert(history[1].tx_type == "WITHDRAW" || history[1].tx_type == "ALLOW");
 
       assertEquals(parseFloat(history[2].amount), history[2].amount);
       assertEquals(
@@ -242,7 +242,9 @@ Deno.test({
       assertEquals(history[2].direction, "Out");
       assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
       assertEquals(history[2].id.length, 64);
-      assertEquals(history[2].type == "WITHDRAW" || history[2].type == "ALLOW");
+      assertEquals(
+        history[2].tx_type == "WITHDRAW" || history[2].tx_type == "ALLOW"
+      );
     });
   },
   sanitizeResources: false,
