@@ -242,7 +242,7 @@ Deno.test({
       assertEquals(history[2].direction, "Out");
       assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
       assertEquals(history[2].id.length, 64);
-      assertEquals(new String(history[1].tx_type), history[1].tx_type);
+      assertEquals(new String(history[2].tx_type), history[2].tx_type);
     });
   },
   sanitizeResources: false,
