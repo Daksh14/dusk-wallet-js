@@ -83,15 +83,20 @@ export async function txFromBlock(block_height) {
     `query { block(height: ${block_height}) { transactions {id, raw}}}`
   );
 
-  for (const tx of txRemote.block.transactions) {
-    const spentTx = await graphQLRequest(
-      `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`
-    );
+  if (
+    Object.prototype.hasOwnProperty.call(txRemote, "block") &&
+    Object.prototype.hasOwnProperty.call(txRemote.block, "transactions")
+  ) {
+    for (const tx of txRemote.block.transactions) {
+      const spentTx = await graphQLRequest(
+        `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`
+      );
 
-    ret.push({
-      raw_tx: tx.raw,
-      gas_spent: spentTx.tx.gasSpent,
-    });
+      ret.push({
+        raw_tx: tx.raw,
+        gas_spent: spentTx.tx.gasSpent,
+      });
+    }
   }
 
   return ret;

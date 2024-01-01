@@ -92,7 +92,11 @@ export async function sync(wasm, seed, node = NODE) {
   let lastPos = 0;
 
   for await (const chunk of resp.body) {
-    buffer.push(...chunk);
+    const len = chunk.length;
+
+    for (let i = 0; i < len; i++) {
+      buffer.push(chunk[i]);
+    }
 
     for (let i = 0; i < buffer.length; i += leafSize) {
       const leaf = buffer.slice(i, i + leafSize);
