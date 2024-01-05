@@ -16,7 +16,7 @@ import {
   getLastPosIncremented,
   correctNotes,
 } from "./db.js";
-import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
+import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
 // env variables
@@ -89,7 +89,6 @@ export async function sync(wasm, seed, node = NODE) {
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
   const buffer = [];
-  let lastPos = 0;
 
   for await (const chunk of resp.body) {
     const len = chunk.length;
@@ -97,39 +96,19 @@ export async function sync(wasm, seed, node = NODE) {
     for (let i = 0; i < len; i++) {
       buffer.push(chunk[i]);
     }
-
-    for (let i = 0; i < buffer.length; i += leafSize) {
-      const leaf = buffer.slice(i, i + leafSize);
-
-      if (leaf.length == 0) {
-        console.warn("no leaf found from the node");
-
-        break;
-      }
-
-      if (leaf.length !== leafSize) {
-        break;
-      }
-
-      // get the tree leaf rkyv serialized
-      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
-
-      const note = treeLeaf.note;
-      const pos = treeLeaf.last_pos;
-
-      const owned = checkIfOwned(wasm, seed, note);
-
-      if (owned.is_owned) {
-        lastPos = Math.max(lastPos, pos);
-
-        notes.push(note);
-        positions.push(pos);
-        blockHeights.push(treeLeaf.block_height);
-        nullifiers.push(owned.nullifier);
-        psks.push(owned.public_spend_key);
-      }
-    }
   }
+
+  const owned = getOwnedNotes(wasm, seed, buffer);
+
+  owned.owned_notes.forEach((note) => {
+    notes.push(note.note);
+    nullifiers.push(note.nullifier);
+    psks.push(note.public_spend_key);
+    blockHeights.push(note.block_height);
+    positions.push(note.pos);
+  });
+
+  const lastPos = owned.last_pos;
 
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
 

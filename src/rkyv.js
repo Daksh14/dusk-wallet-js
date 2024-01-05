@@ -6,23 +6,7 @@
 
 // This includes helper methods to rkyv serialize deserialize stuff
 import { call, jsonFromBytes } from "./wasm.js";
-/**
- * get the tree leaf from leaf the node sent us, deserialized
- * into notes and block height
- * @param {WebAssembly.Exports} wasm
- * @param {Uint8Array} leaf bytes you get from the node
- * @returns {object} json serialized bytes of leaf (note and height)
- */
-export function getTreeLeafDeserialized(wasm, leaf) {
-  // we want to send the data in json to walconst-core
-  const args = JSON.stringify({
-    bytes: Array.from(leaf),
-  });
 
-  const treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
-
-  return treeLeaf;
-}
 /**
  * Convert a number to rkyv serialized bytes
  * @param {WebAssembly.Exports} wasm

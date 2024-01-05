@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { call, jsonFromBytes } from "./wasm.js";
+import { call, jsonFromBytes, call_raw } from "./wasm.js";
 
 /**
  * Get nullifiers for the notes
@@ -27,16 +27,18 @@ export function getNullifiers(wasm, seed, notes) {
  * for given seed.
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
- * @param {Uint8Array} note - Note Singular Note we want to find the ownership of
- * @returns {boolean} ownership - true if the note is owned by the seed
+ * @param {Uint8Array} leaves - leafs we get from the node
+ * @returns {object} - object.last_pos, object.owned_notes
  */
-export function checkIfOwned(wasm, seed, note) {
-  const json = JSON.stringify({
-    seed: Array.from(seed),
-    note: Array.from(note),
-  });
+export function getOwnedNotes(wasm, seed, leaves) {
+  const args = new Uint8Array(seed.length + leaves.length);
 
-  return jsonFromBytes(call(wasm, json, wasm.check_note_ownership));
+  args.set(seed);
+  args.set(leaves, seed.length);
+
+  console.log(args);
+
+  return jsonFromBytes(call_raw(wasm, args, wasm.check_note_ownership));
 }
 
 /**

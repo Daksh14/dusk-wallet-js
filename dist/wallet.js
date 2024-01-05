@@ -62,6 +62,18 @@ function call(wasm, args, function_call) {
   const bytes = getAndFree(wasm, callResult);
   return bytes;
 }
+function call_raw(wasm, args, function_call) {
+  const ptr = alloc(wasm, args);
+  const call2 = function_call(ptr, args.length);
+  const callResult = decompose(call2);
+  if (!callResult.status) {
+    console.error(
+      "Function call " + function_call.name.toString() + " failed!"
+    );
+  }
+  const bytes = getAndFree(wasm, callResult);
+  return bytes;
+}
 
 // src/keys.js
 function getPsks(wasm, seed) {
@@ -79,12 +91,12 @@ function getPublicKeyRkyvSerialized(wasm, seed, index) {
 }
 
 // src/crypto.js
-function checkIfOwned(wasm, seed, note) {
-  const json = JSON.stringify({
-    seed: Array.from(seed),
-    note: Array.from(note)
-  });
-  return jsonFromBytes(call(wasm, json, wasm.check_note_ownership));
+function getOwnedNotes(wasm, seed, leaves) {
+  const args = new Uint8Array(seed.length + leaves.length);
+  args.set(seed);
+  args.set(leaves, seed.length);
+  console.log(args);
+  return jsonFromBytes(call_raw(wasm, args, wasm.check_note_ownership));
 }
 function unspentSpentNotes(wasm, notes, nullifiersOfNote, blockHeights, existingNullifiers, psks) {
   const args = JSON.stringify({
@@ -9539,13 +9551,6 @@ var {
 } = path2;
 
 // src/rkyv.js
-function getTreeLeafDeserialized(wasm, leaf) {
-  const args = JSON.stringify({
-    bytes: Array.from(leaf)
-  });
-  const treeLeaf = jsonFromBytes(call(wasm, args, wasm.rkyv_tree_leaf));
-  return treeLeaf;
-}
 function getU64RkyvSerialized(wasm, num) {
   const args = JSON.stringify({
     value: num
@@ -9578,7 +9583,7 @@ function getOpeningsSerialized(wasm, bytes) {
 // src/node.js
 var RKYV_TREE_LEAF_SIZE = "632";
 var TRANSFER_CONTRACT = "0100000000000000000000000000000000000000000000000000000000000000";
-var NODE = "http://127.0.0.1:8080/";
+var NODE = "https://nodes.dusk.network";
 function StakeInfo(has_key, has_staked, eligiblity, amount, reward, counter, epoch) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -9603,32 +9608,21 @@ async function sync(wasm, seed, node = NODE) {
   const blockHeights = [];
   const positions = [];
   const buffer = [];
-  let lastPos = 0;
   for await (const chunk of resp.body) {
-    buffer.push(...chunk);
-    for (let i = 0; i < buffer.length; i += leafSize) {
-      const leaf = buffer.slice(i, i + leafSize);
-      if (leaf.length == 0) {
-        console.warn("no leaf found from the node");
-        break;
-      }
-      if (leaf.length !== leafSize) {
-        break;
-      }
-      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
-      const note = treeLeaf.note;
-      const pos = treeLeaf.last_pos;
-      const owned = checkIfOwned(wasm, seed, note);
-      if (owned.is_owned) {
-        lastPos = Math.max(lastPos, pos);
-        notes.push(note);
-        positions.push(pos);
-        blockHeights.push(treeLeaf.block_height);
-        nullifiers.push(owned.nullifier);
-        psks.push(owned.public_spend_key);
-      }
+    const len = chunk.length;
+    for (let i = 0; i < len; i++) {
+      buffer.push(chunk[i]);
     }
   }
+  const owned = getOwnedNotes(wasm, seed, buffer);
+  owned.owned_notes.forEach((note) => {
+    notes.push(note.note);
+    nullifiers.push(note.nullifier);
+    psks.push(note.public_spend_key);
+    blockHeights.push(note.block_height);
+    positions.push(note.pos);
+  });
+  const lastPos = owned.last_pos;
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
   const existingNullifiersBytes = await responseBytes(
     await request(nullifiersSerialized, "existing_nullifiers", false)
@@ -9725,7 +9719,7 @@ async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
     }
     localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
   } catch (e) {
-    console.error("Cannot set pos in local storage, the wallet will be slow");
+    console.error("Cannot set pos in local storage: Error: " + e);
   }
   const db = initializeState();
   await db.unspentNotes.bulkPut(unspentNotes).then(() => {
@@ -9766,8 +9760,8 @@ function getLastPos() {
     } else {
       try {
         return parseInt(lastPos);
-      } catch (e) {
-        console.error("Invalid lastPos set");
+      } catch (_) {
+        console.error("Invalid lastPos set, clearing");
         localStorage.removeItem("lastPos");
         return 0;
       }
@@ -9967,14 +9961,16 @@ async function txFromBlock(block_height) {
   const txRemote = await graphQLRequest(
     `query { block(height: ${block_height}) { transactions {id, raw}}}`
   );
-  for (const tx of txRemote.block.transactions) {
-    const spentTx = await graphQLRequest(
-      `query { tx(hash: "${tx.id}") { gasSpent, err }}`
-    );
-    ret.push({
-      raw_tx: tx.raw,
-      gas_spent: spentTx.tx.gasSpent
-    });
+  if (Object.prototype.hasOwnProperty.call(txRemote, "block") && Object.prototype.hasOwnProperty.call(txRemote.block, "transactions")) {
+    for (const tx of txRemote.block.transactions) {
+      const spentTx = await graphQLRequest(
+        `query { tx(hash: "${tx.id}") { gasSpent, err }}`
+      );
+      ret.push({
+        raw_tx: tx.raw,
+        gas_spent: spentTx.tx.gasSpent
+      });
+    }
   }
   return ret;
 }
@@ -10362,7 +10358,9 @@ async function history(wasm, seed, psk) {
   const lastInsertedBlockHeight = histData.lastBlockHeight;
   histData = histData.history;
   const notes = await getAllNotes(psk);
-  const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
+  const noteBlockHeights = arrayMax(notes.map((note) => note.block_height));
+  console.log(noteBlockHeights);
+  console.log(notes.map((note) => note.block_height));
   if (lastInsertedBlockHeight >= noteBlockHeights) {
     return histData;
   }
@@ -10395,14 +10393,24 @@ async function history(wasm, seed, psk) {
     tx.fee = duskToLux(wasm, parseInt(tx.fee));
     return tx;
   });
-  const lastBlocKHeight = Math.max(...histData.map((tx) => tx.block_height));
+  const lastBlockHeight = arrayMax(histData.map((tx) => tx.block_height));
   const historyData = {
     psk,
     history: history2,
-    lastBlockHeight: lastBlocKHeight
+    lastBlockHeight
   };
   await insertHistory(historyData);
   return history2;
+}
+function arrayMax(arr) {
+  let len = arr.length;
+  let max = -Infinity;
+  while (len--) {
+    if (arr[len] > max) {
+      max = arr[len];
+    }
+  }
+  return max;
 }
 
 // src/mod.js
@@ -10457,6 +10465,12 @@ Wallet.prototype.stake = async function(staker, amount) {
       this.gasPrice
     );
   }
+};
+Wallet.prototype.counter = async function(psk) {
+  const fetchAbi = await fetch("RUSK/CONTRACT_ID");
+  const proof = fetchWasm.wasmExports.counter(psk);
+  const provd = sendProofToRusk(proof);
+  compute_propogate(provd);
 };
 Wallet.prototype.stakeInfo = async function(psk) {
   const index = this.getPsks().indexOf(psk);
