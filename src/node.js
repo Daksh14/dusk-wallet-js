@@ -5,11 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { toBytes, jsonFromBytes, call } from "./wasm.js";
-import {
-  getU64RkyvSerialized,
-  getNullifiersRkyvSerialized,
-  getTreeLeafDeserialized,
-} from "./rkyv.js";
+import { getU64RkyvSerialized, getNullifiersRkyvSerialized } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
 import {
   insertSpentUnspentNotes,
@@ -20,7 +16,6 @@ import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
 // env variables
-const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
 
@@ -64,7 +59,6 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, node = NODE) {
-  const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -79,13 +73,6 @@ export async function sync(wasm, seed, node = NODE) {
     node
   );
 
-  // The notes we get from the network which we might own or not
-  const notes = [];
-  const nullifiers = [];
-  const psks = [];
-  const blockHeights = [];
-  const positions = [];
-
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
   const buffer = [];
@@ -99,15 +86,10 @@ export async function sync(wasm, seed, node = NODE) {
   }
 
   const owned = getOwnedNotes(wasm, seed, buffer);
-
-  owned.owned_notes.forEach((note) => {
-    notes.push(note.note);
-    nullifiers.push(note.nullifier);
-    psks.push(note.public_spend_key);
-    blockHeights.push(note.block_height);
-    positions.push(note.pos);
-  });
-
+  const notes = owned.notes;
+  const nullifiers = owned.nullifiers;
+  const psks = owned.public_spend_keys;
+  const blockHeights = owned.block_heights.split(",").map(Number);
   const lastPos = owned.last_pos;
 
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);

@@ -20,18 +20,18 @@
       import { Wallet, generateRandomMnemonic } from "../dist/wallet.js";
       // Default wallet seed
       const seed = [
-        153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115,
-        19, 81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168,
-        214, 242, 68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55,
-        172, 27, 255, 184, 55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117,
-        221, 221,
+        62, 107, 200, 150, 136, 164, 160, 96, 51, 120, 7, 147, 214, 247, 92,
+        129, 153, 233, 162, 121, 45, 209, 233, 4, 196, 182, 194, 50, 226, 95,
+        225, 223, 1, 209, 19, 127, 114, 244, 87, 156, 95, 12, 108, 92, 35, 150,
+        211, 217, 255, 93, 119, 231, 14, 95, 93, 185, 216, 108, 32, 89, 33, 225,
+        58, 184,
       ];
 
       let memory;
 
       const imports = {
         env: {
-          log_string(ptr, len) {
+          log_str(ptr, len) {
             console.log(readString(ptr, len));
           },
         },
@@ -45,31 +45,28 @@
       }
 
       const initWasm = async () => {
-        fetch("../assets/dusk-wallet-core-0.21.0.wasm")
-          .then((response) => response.arrayBuffer())
-          .then((buffer) => WebAssembly.instantiate(buffer, imports))
-          .then(async (result) => {
-            console.log("wasm loaded!: ", result);
-            const exports = result.instance.exports;
-            memory = exports.memory;
+        //   const exports = result.instance.exports;
+        //   memory = exports.memory;
 
-            let wallet = new Wallet(exports, seed);
-            let psks = wallet.getPsks();
-            console.log(psks);
+        let wallet = new Wallet(seed);
+        let psks = wallet.getPsks();
+        console.log(psks);
 
-            // console.log(getTreeLeafDeserialized(exports, leaf));
+        // console.log(getTreeLeafDeserialized(exports, leaf));
 
-            let sync = await wallet.sync();
+        var startTime = performance.now();
 
-            console.log(await wallet.history(psks[0]));
+        let sync = await wallet.sync();
 
-            // await wallet.transfer(psks[0], psks[1], 193);
-          })
-          .catch((err) =>
-            setTimeout(() => {
-              throw err;
-            })
-          );
+        var endTime = performance.now();
+
+        console.log(`Call to sync took ${endTime - startTime} milliseconds`);
+
+        console.log(await wallet.history(psks[0]));
+
+        wallet.reset();
+
+        // await wallet.transfer(psks[0], psks[1], 193);
       };
 
       console.log("test");

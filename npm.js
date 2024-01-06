@@ -2,6 +2,36 @@ import { build, emptyDir } from "https://deno.land/x/dnt/mod.ts";
 
 await emptyDir("./npm");
 
+const wasm = await Deno.readFile(
+  "../../Rust/wallet-core/pkg/dusk_wallet_core_bg.wasm"
+);
+const string = `let wasm = new Uint8Array([${wasm.join(
+  ","
+)}]);let __wbg_star0 = {};`;
+const jsFile = await Deno.open(
+  "../../Rust/wallet-core/pkg/dusk_wallet_core.js"
+);
+const lines = jsFile.readable.getReader();
+
+const decoder = new TextDecoder();
+
+let done = false;
+let str = "";
+
+do {
+  const result = await lines.read();
+  done = result.done;
+
+  if (result.value) {
+    str = str + decoder.decode(result.value);
+  }
+} while (!done);
+
+str = str.slice(46);
+str = string + str;
+
+await Deno.writeTextFile("./pkg/dusk_wallet_core.js", str);
+
 await build({
   entryPoints: ["./src/mod.js"],
   outDir: "./npm",
@@ -12,7 +42,6 @@ await build({
     "npm:fake-indexeddb": {
       name: "fake-indexeddb",
       version: "5.0.1",
-      peerDependency: true,
     },
     "https://unpkg.com/dexie/dist/dexie.mjs": {
       name: "dexie",

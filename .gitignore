@@ -2,3 +2,8 @@ cache
 
 npm
 out
+
+npm.js
+
+assets/
+pkg/

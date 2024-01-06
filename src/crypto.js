@@ -36,8 +36,6 @@ export function getOwnedNotes(wasm, seed, leaves) {
   args.set(seed);
   args.set(leaves, seed.length);
 
-  console.log(args);
-
   return jsonFromBytes(call_raw(wasm, args, wasm.check_note_ownership));
 }
 
