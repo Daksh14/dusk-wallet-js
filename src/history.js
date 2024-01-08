@@ -47,7 +47,9 @@ export async function history(wasm, seed, psk) {
 
   const notes = await getAllNotes(psk);
 
-  const noteBlockHeights = Math.max(...notes.map((note) => note.block_height));
+  const noteBlockHeights = arrayMax(notes.map((note) => note.block_height));
+
+  console.log(notes.map((note) => note.block_height));
 
   if (lastInsertedBlockHeight >= noteBlockHeights) {
     return histData;
@@ -89,15 +91,30 @@ export async function history(wasm, seed, psk) {
     return tx;
   });
 
-  const lastBlocKHeight = Math.max(...histData.map((tx) => tx.block_height));
+  const lastBlockHeight = arrayMax(histData.map((tx) => tx.block_height));
 
   const historyData = {
     psk: psk,
     history: history,
-    lastBlockHeight: lastBlocKHeight,
+    lastBlockHeight: lastBlockHeight,
   };
 
   await insertHistory(historyData);
 
   return history;
+}
+/**
+ * Find max from an array
+ * @param {Array<number>} arr The array to find the max from
+ * @returns {number} The max value
+ */
+function arrayMax(arr) {
+  let len = arr.length;
+  let max = -Infinity;
+  while (len--) {
+    if (arr[len] > max) {
+      max = arr[len];
+    }
+  }
+  return max;
 }

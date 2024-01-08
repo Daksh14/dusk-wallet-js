@@ -106,3 +106,27 @@ export function call(wasm, args, function_call) {
 
   return bytes;
 }
+
+/**
+ * Perform a wasm function call with raw bytes
+ * @param {WebAssembly.Exports} wasm
+ * @param {Uint8Array} args Arguments of the function in bytes
+ * @param {WebAssembly.ExportValue} function_call name of the function you want to call
+ * @returns {Uint8Array} bytes return value of the call
+ */
+export function call_raw(wasm, args, function_call) {
+  // allocate the json we want to send to walconst-core
+  const ptr = alloc(wasm, args);
+  const call = function_call(ptr, args.length);
+  const callResult = decompose(call);
+
+  if (!callResult.status) {
+    console.error(
+      "Function call " + function_call.name.toString() + " failed!"
+    );
+  }
+
+  const bytes = getAndFree(wasm, callResult);
+
+  return bytes;
+}

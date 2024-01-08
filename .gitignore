@@ -2,3 +2,11 @@ cache
 
 npm
 out
+
+npm.js
+
+assets/
+
+.DS_Store
+
+pkg/.DS_Store

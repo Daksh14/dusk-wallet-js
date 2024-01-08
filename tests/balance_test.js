@@ -9,11 +9,7 @@ const DEFAULT_SEED = [
   55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117, 221, 221,
 ];
 
-const wasm = await Deno.readFile("./assets/dusk-wallet-core-0.21.0.wasm");
-const initWasm = await WebAssembly.instantiate(wasm);
-const exports = initWasm.instance.exports;
-
-const wallet = new Wallet(exports, DEFAULT_SEED);
+const wallet = new Wallet(DEFAULT_SEED);
 const psks = wallet.getPsks();
 
 Dexie.dependencies.indexedDB = indexedDB;

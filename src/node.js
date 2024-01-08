@@ -5,22 +5,17 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { toBytes, jsonFromBytes, call } from "./wasm.js";
-import {
-  getU64RkyvSerialized,
-  getNullifiersRkyvSerialized,
-  getTreeLeafDeserialized,
-} from "./rkyv.js";
+import { getU64RkyvSerialized, getNullifiersRkyvSerialized } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
 import {
   insertSpentUnspentNotes,
   getLastPosIncremented,
   correctNotes,
 } from "./db.js";
-import { checkIfOwned, unspentSpentNotes } from "./crypto.js";
+import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
 // env variables
-const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
 
@@ -64,7 +59,6 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, node = NODE) {
-  const leafSize = parseInt(RKYV_TREE_LEAF_SIZE);
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -79,17 +73,9 @@ export async function sync(wasm, seed, node = NODE) {
     node
   );
 
-  // The notes we get from the network which we might own or not
-  const notes = [];
-  const nullifiers = [];
-  const psks = [];
-  const blockHeights = [];
-  const positions = [];
-
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
   const buffer = [];
-  let lastPos = 0;
 
   for await (const chunk of resp.body) {
     const len = chunk.length;
@@ -97,39 +83,14 @@ export async function sync(wasm, seed, node = NODE) {
     for (let i = 0; i < len; i++) {
       buffer.push(chunk[i]);
     }
-
-    for (let i = 0; i < buffer.length; i += leafSize) {
-      const leaf = buffer.slice(i, i + leafSize);
-
-      if (leaf.length == 0) {
-        console.warn("no leaf found from the node");
-
-        break;
-      }
-
-      if (leaf.length !== leafSize) {
-        break;
-      }
-
-      // get the tree leaf rkyv serialized
-      const treeLeaf = getTreeLeafDeserialized(wasm, leaf);
-
-      const note = treeLeaf.note;
-      const pos = treeLeaf.last_pos;
-
-      const owned = checkIfOwned(wasm, seed, note);
-
-      if (owned.is_owned) {
-        lastPos = Math.max(lastPos, pos);
-
-        notes.push(note);
-        positions.push(pos);
-        blockHeights.push(treeLeaf.block_height);
-        nullifiers.push(owned.nullifier);
-        psks.push(owned.public_spend_key);
-      }
-    }
   }
+
+  const owned = getOwnedNotes(wasm, seed, buffer);
+  const notes = owned.notes;
+  const nullifiers = owned.nullifiers;
+  const psks = owned.public_spend_keys;
+  const blockHeights = owned.block_heights.split(",").map(Number);
+  const lastPos = owned.last_pos;
 
   const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
 

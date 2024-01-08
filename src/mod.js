@@ -20,22 +20,32 @@ import {
 import { history } from "./history.js";
 import { clearDB } from "./db.js";
 
+import { initSync } from "../deps.js";
+
 // Export mnemonic functions and other helper functions
 export { generateRandomMnemonic, getSeedFromMnemonic, txStatus };
 
 /**
- * Construct a wallet from this function
+ * Construct a wallet from this function, this function will load the web assembly into the buffer
+ * and instantiate it, it will block until the web assembly is loaded
  *
  * @class Wallet
  * @type {Object}
- * @property {WebAssembly.Exports} wasmExports The exports of the wallet-core wasm
- * binary https://github.com/dusk-network/wallet-core
  * @property {Uint8Array} seed The seed of the wallet
  * @property {number} [gasLimit] The gas limit of the wallet, default is 2900000000
  * @property {number} [gasPrice] The gas price of the wallet, default is 1
  */
-export function Wallet(wasmExports, seed, gasLimit = 2900000000, gasPrice = 1) {
-  this.wasm = wasmExports;
+export function Wallet(seed, gasLimit = 2900000000, gasPrice = 1) {
+  const module = initSync();
+  const instance = new WebAssembly.Instance(new WebAssembly.Module(module), {
+    env: {
+      panic: function (ptr, len) {
+        console.log("Panic called");
+      },
+    },
+  });
+
+  this.wasm = instance.exports;
   this.seed = seed;
   this.gasLimit = gasLimit;
   this.gasPrice = gasPrice;
