@@ -6,4 +6,7 @@ out
 npm.js
 
 assets/
-pkg/
+
+.DS_Store
+
+pkg/.DS_Store
