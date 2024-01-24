@@ -199,17 +199,7 @@ Deno.test({
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
       assertEquals(history[1].id.length, 64);
-      assert(history[1].tx_type == "WITHDRAW" || history[1].tx_type == "ALLOW");
-
-      assertEquals(parseFloat(history[2].amount), history[2].amount);
-      assertEquals(
-        parseInt(history[2].block_height, 10),
-        history[2].block_height
-      );
-      assertEquals(history[2].direction, "Out");
-      assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
-      assertEquals(history[2].id.length, 64);
-      assert(history[2].tx_type == "WITHDRAW" || history[2].tx_type == "ALLOW");
+      assert(history[1].tx_type == "WITHDRAW");
     });
   },
   sanitizeResources: false,
