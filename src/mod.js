@@ -14,7 +14,6 @@ import { generateRandomMnemonic, getSeedFromMnemonic } from "./mnemonic.js";
 import {
   stake,
   unstake,
-  stakeAllow,
   withdrawReward,
 } from "./contracts/stake.js";
 import { history } from "./history.js";
@@ -157,6 +156,7 @@ Wallet.prototype.stakeInfo = async function (psk) {
 
   return info;
 };
+
 /**
  * Unstake dusk from the provided psk, refund to the same psk
  * @param {string} unstaker bs58 encoded psk to unstake from
@@ -177,42 +177,6 @@ Wallet.prototype.unstake = function (unstaker) {
     this.gasLimit,
     this.gasPrice
   );
-};
-
-/**
- * Allow staking dusk from the provided psk
- * @param {string} allowStakePsk psk to allow staking from
- * @param {string} [senderPsk] senderPsk the psk of the sender, if undefined then index 0 (default index) is used
- * @returns {Promise} promise resolves when stake allow request is obtained
- */
-Wallet.prototype.stakeAllow = function (allowStakePsk, senderPsk) {
-  const psks = this.getPsks();
-  const staker = psks.indexOf(allowStakePsk);
-  const sender = psks.indexOf(senderPsk);
-
-  if (staker === -1) {
-    throw new Error("staker psk not found");
-  }
-
-  if (sender === -1) {
-    return stakeAllow(
-      this.wasm,
-      this.seed,
-      staker,
-      0,
-      this.gasLimit,
-      this.gasPrice
-    );
-  } else {
-    return stakeAllow(
-      this.wasm,
-      this.seed,
-      staker,
-      sender,
-      this.gasLimit,
-      this.gasPrice
-    );
-  }
 };
 
 /**

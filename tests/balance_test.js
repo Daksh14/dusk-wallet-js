@@ -176,35 +176,6 @@ Deno.test({
 });
 
 Deno.test({
-  name: "stake_allow",
-  async fn() {
-    await wallet.sync().then(async () => {
-      const info = await wallet.stakeInfo(psks[2]);
-
-      // make sure the 2nd psk isn't allowed for staking
-      if (info.has_key === false) {
-        // allow staking for 2nd psk
-        await wallet.stakeAllow(psks[2]);
-      }
-    });
-  },
-  sanitizeResources: false,
-  sanitizeOps: false,
-});
-
-Deno.test({
-  name: "stake_allow_check",
-  async fn() {
-    const info = await wallet.stakeInfo(psks[2]);
-    // check if staking is allowed
-    assert(info.has_key === true);
-    console.log("stake allow check ok");
-  },
-  sanitizeResources: false,
-  sanitizeOps: false,
-});
-
-Deno.test({
   name: "tx_history_check",
   async fn() {
     await wallet.sync().then(async () => {
