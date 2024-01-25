@@ -8,6 +8,23 @@ import * as esbuild from "https://deno.land/x/esbuild@v0.19.4/mod.js";
 import { load } from "https://deno.land/std@0.204.0/dotenv/mod.ts";
 import { cache } from "https://deno.land/x/esbuild_plugin_cache@v0.2.10/mod.ts";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.2/mod.ts";
+import * as path from "https://deno.land/std@0.102.0/path/mod.ts";
+
+const walletCorePath = Deno.env.get("WALLET_CORE_PATH");
+
+if (!walletCorePath) {
+  throw new Error("WALLET_CORE_PATH env var not set");
+}
+
+const wasmPath = path.join(walletCorePath, "dusk_wallet_core_bg.wasm");
+
+const wasm = await Deno.readFile(wasmPath);
+
+const string = `let wasm = new Uint8Array([${wasm.join(
+  ","
+)}]);function initSync(){return wasm};export { initSync }`;
+
+await Deno.writeTextFile("./dist/dusk_wallet_core.js", string);
 
 const importMap = { imports: {} };
 const env = await load({ export: true });

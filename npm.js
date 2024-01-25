@@ -1,22 +1,20 @@
 import { build, emptyDir } from "https://deno.land/x/dnt/mod.ts";
+import { existsSync } from "https://deno.land/std@0.213.0/fs/mod.ts";
+import * as semver from "https://deno.land/x/semver/mod.ts";
 
 await emptyDir("./npm");
 
-const wasm = await Deno.readFile(
-  "../../Rust/wallet-core/pkg/dusk_wallet_core_bg.wasm"
-);
-const string = `let wasm = new Uint8Array([${wasm.join(
-  ","
-)}]);function initSync(){return wasm};export { initSync }`;
-const jsFile = await Deno.open(
-  "../../Rust/wallet-core/pkg/dusk_wallet_core.js"
-);
+const hasBuilt = existsSync("./dist/dusk_wallet_core.js", {
+  isFile: true,
+});
 
-await Deno.writeTextFile("./pkg/dusk_wallet_core.js", string);
+if (!hasBuilt) {
+  throw new Error("Please build the library first using deno task build");
+}
 
 // get the most recent git tag
 const cmd = new Deno.Command("git", {
-  args: ["describe", "--tags", "--abbrev=0"],
+  args: ["tag"],
 });
 
 const cmdDirty = new Deno.Command("git", {
@@ -31,10 +29,10 @@ const cmdDirty = new Deno.Command("git", {
   ],
 });
 
-const gitTag = await cmd.output();
+const gitTags = await cmd.output();
 const codeDirty = await cmdDirty.output();
 
-if (!gitTag.success) {
+if (!gitTags.success) {
   throw new Error("Cannot get git tag");
 }
 
@@ -42,29 +40,39 @@ if (!codeDirty.success) {
   throw new Error("Cannot check if git repo is dirty");
 }
 
-let tag = new TextDecoder().decode(gitTag.stdout).replace("\n", "");
+const stringTags = new TextDecoder().decode(gitTags.stdout);
+const tags = stringTags
+  .split("\n")
+  .filter((t) => t !== "")
+  .map((t) => semver.clean(t));
 
-if (tag === "") {
-  throw new Error("No git tag found");
+const latest = semver.maxSatisfying(tags, "*");
+
+let version;
+
+if (latest === "") {
+  throw new Error("No latest tag found");
 }
 
 if (Deno.args.length > 0) {
   console.log("Using version from command line");
 
-  if (Deno.args[0] === tag) {
+  if (Deno.args[0] !== tag) {
     throw new Error(
-      "Version from command line is not the same as the latest git tag, create a new git tag"
+      "Version from command line is not the same as the latest git tag, create a new git tag before"
     );
   }
 
-  tag = Deno.args[0];
+  version = Deno.args[0];
+} else {
+  version = latest;
 }
 
 const isDirty = new TextDecoder().decode(codeDirty.stdout);
 
-if (isDirty !== "") {
-  throw new Error("Git repo is dirty, commit changes before building");
-}
+// if (isDirty !== "") {
+//   throw new Error("Git repo is dirty, commit changes before building");
+// }
 
 await build({
   entryPoints: ["./src/mod.js"],
@@ -86,7 +94,7 @@ await build({
   package: {
     // package.json properties
     name: "@dusk-network/dusk-wallet-js",
-    version: tag,
+    version: version,
     description: "JS library for interacting with the dusk network",
     license: "MPL",
     repository: {

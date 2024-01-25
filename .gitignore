@@ -3,6 +3,8 @@ cache
 npm
 out
 
+dist/
+pkg/
 assets/
 
 .DS_Store
