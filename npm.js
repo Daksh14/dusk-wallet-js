@@ -14,6 +14,58 @@ const jsFile = await Deno.open(
 
 await Deno.writeTextFile("./pkg/dusk_wallet_core.js", string);
 
+// get the most recent git tag
+const cmd = new Deno.Command("git", {
+  args: ["describe", "--tags", "--abbrev=0"],
+});
+
+const cmdDirty = new Deno.Command("git", {
+  args: [
+    "ls-files",
+    "--deleted",
+    "--modified",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ":/",
+  ],
+});
+
+const gitTag = await cmd.output();
+const codeDirty = await cmdDirty.output();
+
+if (!gitTag.success) {
+  throw new Error("Cannot get git tag");
+}
+
+if (!codeDirty.success) {
+  throw new Error("Cannot check if git repo is dirty");
+}
+
+let tag = new TextDecoder().decode(gitTag.stdout).replace("\n", "");
+
+if (tag === "") {
+  throw new Error("No git tag found");
+}
+
+if (Deno.args.length > 0) {
+  console.log("Using version from command line");
+
+  if (Deno.args[0] === tag) {
+    throw new Error(
+      "Version from command line is not the same as the latest git tag, create a new git tag"
+    );
+  }
+
+  tag = Deno.args[0];
+}
+
+const isDirty = new TextDecoder().decode(codeDirty.stdout);
+
+if (isDirty !== "") {
+  throw new Error("Git repo is dirty, commit changes before building");
+}
+
 await build({
   entryPoints: ["./src/mod.js"],
   outDir: "./npm",
@@ -34,7 +86,7 @@ await build({
   package: {
     // package.json properties
     name: "@dusk-network/dusk-wallet-js",
-    version: Deno.args[0],
+    version: tag,
     description: "JS library for interacting with the dusk network",
     license: "MPL",
     repository: {
