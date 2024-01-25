@@ -1,6 +1,6 @@
 import { Wallet } from "../dist/wallet.js"; // url_test.ts
-
 import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
+import { existsSync } from "https://deno.land/std@0.213.0/fs/mod.ts";
 
 const DEFAULT_SEED = [
   153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115, 19,
@@ -216,6 +216,37 @@ Deno.test({
     const exists = await Dexie.exists("state");
 
     assert(!exists);
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "check if npm.js builds the package",
+  async fn() {
+    const isReadableDir = existsSync("./npm", {
+      isDirectory: true,
+    });
+
+    if (isReadableDir) {
+      await Deno.remove("./npm", { recursive: true });
+    }
+
+    const command = new Deno.Command(Deno.execPath(), {
+      args: ["run", "-A", "npm.js"],
+    });
+
+    const process = await command.output();
+
+    assert(process.success);
+
+    const checkIfMade = existsSync("./npm", {
+      isDirectory: true,
+    });
+
+    console.log(checkIfMade);
+
+    assert(checkIfMade);
   },
   sanitizeResources: false,
   sanitizeOps: false,
