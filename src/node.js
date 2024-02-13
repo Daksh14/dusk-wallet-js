@@ -21,6 +21,16 @@ const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
 
 /**
+ * Extend array by another array
+ * @param {Array} other_array
+ */
+Array.prototype.extend = function (other_array) {
+  other_array.forEach(function (v) {
+    this.push(v);
+  }, this);
+};
+
+/**
  *
  * @param {boolean} has_key If the user has the key in the allow list or not
  * @param {boolean} has_staked If the user has staked before
@@ -78,12 +88,6 @@ export async function sync(wasm, seed, node = NODE) {
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
   let buffer = [];
-  const notes = [];
-  const nullifiers = [];
-  const psks = [];
-  const blockHeights = [];
-
-  let lastPos = 0;
 
   for await (const chunk of resp.body) {
     const len = chunk.length;
@@ -91,50 +95,14 @@ export async function sync(wasm, seed, node = NODE) {
     for (let i = 0; i < len; i++) {
       buffer.push(chunk[i]);
     }
-
-    let chunkSize = 632;
-
-    if (buffer.length >= 632) {
-      const numNotes = Math.floor(buffer.length / 632);
-      const notesPerFunction = 80;
-
-      if (numNotes > notesPerFunction) {
-        chunkSize = 632 * notesPerFunction;
-      } else {
-        chunkSize = 632 * numNotes;
-      }
-    } else {
-      break;
-    }
-
-    for (let i = 0; i < buffer.length; i += chunkSize) {
-      const slice = buffer.slice(i, i + chunkSize);
-
-      // this is the remainder
-      if (slice.length % 632 !== 0) {
-        buffer = slice;
-
-        break;
-      }
-
-      const owned = await getOwnedNotes(wasm, seed, slice);
-
-      buffer.splice(i, chunkSize);
-
-      i = 0;
-
-      const ownedNotes = owned.notes;
-      const ownedNullifiers = owned.nullifiers;
-      const ownedPsks = owned.public_spend_keys;
-      const ownedBlockHeights = owned.block_heights.split(",").map(Number);
-      lastPos = owned.last_pos;
-
-      notes.extend(ownedNotes);
-      nullifiers.extend(ownedNullifiers);
-      psks.extend(ownedPsks);
-      blockHeights.extend(ownedBlockHeights);
-    }
   }
+
+  const owned = await getOwnedNotes(wasm, seed, buffer);
+  const notes = owned.notes;
+  const nullifiers = owned.nullifiers;
+  const psks = owned.public_spend_keys;
+  const blockHeights = owned.block_heights.split(",").map(Number);
+  const lastPos = owned.last_pos;
 
   const nullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,

@@ -42,7 +42,7 @@ Deno.test({
 Deno.test({
   name: "25 psks",
   fn() {
-    assertEquals(psks.length, 9);
+    assertEquals(psks.length, 4);
   },
 });
 
@@ -191,7 +191,7 @@ Deno.test({
       assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
       assertEquals(
         parseInt(history[0].block_height, 10),
-        history[0].block_height,
+        history[0].block_height
       );
       assertEquals(history[0].direction, "Out");
       assertEquals(history[0].fee.toFixed(PRECISION_DIGITS), "0.0003");
@@ -201,7 +201,7 @@ Deno.test({
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
         parseInt(history[1].block_height, 10),
-        history[1].block_height,
+        history[1].block_height
       );
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
