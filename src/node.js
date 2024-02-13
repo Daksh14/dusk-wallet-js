@@ -37,7 +37,7 @@ export function StakeInfo(
   amount,
   reward,
   counter,
-  epoch,
+  epoch
 ) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -60,6 +60,7 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, node = NODE) {
+  const startTime = performance.now();
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -71,12 +72,18 @@ export async function sync(wasm, seed, node = NODE) {
     await getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
-    node,
+    node
   );
 
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
-  const buffer = [];
+  let buffer = [];
+  const notes = [];
+  const nullifiers = [];
+  const psks = [];
+  const blockHeights = [];
+
+  let lastPos = 0;
 
   for await (const chunk of resp.body) {
     const len = chunk.length;
@@ -84,23 +91,59 @@ export async function sync(wasm, seed, node = NODE) {
     for (let i = 0; i < len; i++) {
       buffer.push(chunk[i]);
     }
-  }
 
-  const owned = await getOwnedNotes(wasm, seed, buffer);
-  const notes = owned.notes;
-  const nullifiers = owned.nullifiers;
-  const psks = owned.public_spend_keys;
-  const blockHeights = owned.block_heights.split(",").map(Number);
-  const lastPos = owned.last_pos;
+    let chunkSize = 632;
+
+    if (buffer.length >= 632) {
+      const numNotes = Math.floor(buffer.length / 632);
+      const notesPerFunction = 80;
+
+      if (numNotes > notesPerFunction) {
+        chunkSize = 632 * notesPerFunction;
+      } else {
+        chunkSize = 632 * numNotes;
+      }
+    } else {
+      break;
+    }
+
+    for (let i = 0; i < buffer.length; i += chunkSize) {
+      const slice = buffer.slice(i, i + chunkSize);
+
+      // this is the remainder
+      if (slice.length % 632 !== 0) {
+        buffer = slice;
+
+        break;
+      }
+
+      const owned = await getOwnedNotes(wasm, seed, slice);
+
+      buffer.splice(i, chunkSize);
+
+      i = 0;
+
+      const ownedNotes = owned.notes;
+      const ownedNullifiers = owned.nullifiers;
+      const ownedPsks = owned.public_spend_keys;
+      const ownedBlockHeights = owned.block_heights.split(",").map(Number);
+      lastPos = owned.last_pos;
+
+      notes.extend(ownedNotes);
+      nullifiers.extend(ownedNullifiers);
+      psks.extend(ownedPsks);
+      blockHeights.extend(ownedBlockHeights);
+    }
+  }
 
   const nullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    nullifiers,
+    nullifiers
   );
 
   // Fetch existing nullifiers from the node
   const existingNullifiersBytes = await responseBytes(
-    await request(nullifiersSerialized, "existing_nullifiers", false),
+    await request(nullifiersSerialized, "existing_nullifiers", false)
   );
 
   const allNotes = await unspentSpentNotes(
@@ -109,13 +152,17 @@ export async function sync(wasm, seed, node = NODE) {
     nullifiers,
     blockHeights,
     existingNullifiersBytes,
-    psks,
+    psks
   );
 
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
   await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
+
+  const endTime = performance.now();
+
+  console.log(`Sync took ${endTime - startTime} milliseconds`);
 
   return correctNotes(wasm);
 }
@@ -135,7 +182,7 @@ export function request(
   stream,
   node = NODE,
   target = TRANSFER_CONTRACT,
-  targetType = "1",
+  targetType = "1"
 ) {
   const request_name_bytes = encode(request_name);
   const number = u32toLE(request_name.length);
@@ -194,8 +241,8 @@ export async function stakeInfo(wasm, seed, index) {
       false,
       undefined,
       process.env.STAKE_CONTRACT,
-      "1",
-    ),
+      "1"
+    )
   );
 
   const args = JSON.stringify({
@@ -212,7 +259,7 @@ export async function stakeInfo(wasm, seed, index) {
     info.reward,
     info.counter,
     // calculating epoch
-    info.eligiblity / 2160,
+    info.eligiblity / 2160
   );
 }
 
