@@ -45,7 +45,7 @@ export async function execute(
   crossover,
   fee,
   gas_limit,
-  gas_price,
+  gas_price
 ) {
   const sender_index = (await getPsks(wasm, seed)).indexOf(psk);
 
@@ -59,7 +59,7 @@ export async function execute(
   for (const noteData of notes) {
     const pos = noteData.pos;
     const fetchedOpening = await fetchOpenings(
-      await getU64RkyvSerialized(wasm, pos),
+      await getU64RkyvSerialized(wasm, pos)
     );
 
     const opening = Array.from(fetchedOpening);
@@ -77,12 +77,12 @@ export async function execute(
   }
 
   const openingsSerialized = Array.from(
-    await getOpeningsSerialized(wasm, openings),
+    await getOpeningsSerialized(wasm, openings)
   );
 
   const inputs = Array.from(await getNotesRkyvSerialized(wasm, allNotes));
 
-  const args = JSON.stringify({
+  const args = {
     call: callData,
     crossover: crossover,
     seed: seed,
@@ -95,11 +95,9 @@ export async function execute(
     sender_index: sender_index,
     gas_limit: gas_limit,
     gas_price: gas_price,
-  });
+  };
 
   const unprovenTx = parseEncodedJSON(await call(wasm, args, "execute")).tx;
-
-  console.log("unrpovenTx length: " + unprovenTx.length);
 
   const varBytes = await getUnprovenTxVarBytes(wasm, unprovenTx);
 
@@ -109,14 +107,12 @@ export async function execute(
     false,
     PROVER,
     "rusk",
-    "2",
+    "2"
   );
 
   if (proofReq.status !== 200) {
     throw new Error("Error while proving the transaction");
   }
-
-  console.log("prove_execute status code: " + proofReq.status);
 
   const buffer = await proofReq.arrayBuffer();
   const bytes = new Uint8Array(buffer);
@@ -131,10 +127,8 @@ export async function execute(
     false,
     undefined,
     "rusk",
-    "2",
+    "2"
   );
-
-  console.log("preverify request status code: " + preVerifyReq.status);
 
   const propogateReq = await request(
     txBytes,
@@ -142,10 +136,8 @@ export async function execute(
     false,
     undefined,
     "Chain",
-    "2",
+    "2"
   );
-
-  console.log("propogating chain request status: " + propogateReq.status);
 
   return waitTillAccept(txHash);
 }

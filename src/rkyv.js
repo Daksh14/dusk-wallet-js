@@ -15,9 +15,9 @@ import { parseEncodedJSON } from "./encoding.js";
  * @returns {Uint8Array} rkyv serialized bytes of the u64
  */
 export function getU64RkyvSerialized(wasm, value) {
-  const args = JSON.stringify({
+  const args = {
     value,
-  });
+  };
 
   return call(wasm, args, "rkyv_u64");
 }
@@ -28,9 +28,9 @@ export function getU64RkyvSerialized(wasm, value) {
  * @returns {Promise<Uint8Array>} rkyv serialized bytes of the Vec<Note>
  */
 export function getNotesRkyvSerialized(wasm, notes) {
-  const args = JSON.stringify({
+  const args = {
     notes,
-  });
+  };
 
   return call(wasm, args, "rkyv_notes_array");
 }
@@ -42,9 +42,9 @@ export function getNotesRkyvSerialized(wasm, notes) {
  * @returns {Array<Uint8Array>} rkyv serialized bytes Vec<Vec<u8>>
  */
 export function getNullifiersRkyvSerialized(wasm, [...bytes]) {
-  const args = JSON.stringify({
+  const args = {
     bytes,
-  });
+  };
 
   return call(wasm, args, "rkyv_bls_scalar_array");
 }
@@ -55,9 +55,9 @@ export function getNullifiersRkyvSerialized(wasm, [...bytes]) {
  * @returns {Array<Uint8Array>} rkyv serialized bytes Vec<Vec<u8>>
  */
 export async function getNullifiersDeserialized(wasm, [...bytes]) {
-  const args = JSON.stringify({
+  const args = {
     bytes,
-  });
+  };
 
   return parseEncodedJSON(await call(wasm, args, "bls_scalar_array_rkyv"))
     .bytes;
@@ -70,9 +70,9 @@ export async function getNullifiersDeserialized(wasm, [...bytes]) {
  * @returns {Uint8Array} rkyv serialized Vec<Openings>
  */
 export function getOpeningsSerialized(wasm, openings) {
-  const args = JSON.stringify({
+  const args = {
     openings,
-  });
+  };
 
   return call(wasm, args, "rkyv_openings_array");
 }

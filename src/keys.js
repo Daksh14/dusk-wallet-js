@@ -15,9 +15,9 @@ import { parseEncodedJSON } from "./encoding.js";
  * @returns {Array<string>} psks base58 encoded public spend keys
  */
 export async function getPsks(wasm, seed) {
-  const json = JSON.stringify({
+  const json = {
     seed: Array.from(seed),
-  });
+  };
 
   return parseEncodedJSON(await call(wasm, json, "public_spend_keys")).keys;
 }
@@ -32,10 +32,10 @@ export async function getPsks(wasm, seed) {
  * @returns {Uint8Array} public_key rkyv serialized
  */
 export function getPublicKeyRkyvSerialized(wasm, [...seed], index) {
-  const json = JSON.stringify({
+  const json = {
     seed,
     index,
-  });
+  };
 
   return call(wasm, json, "get_public_key_rkyv_serialized");
 }

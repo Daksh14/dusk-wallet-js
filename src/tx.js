@@ -14,9 +14,9 @@ import { parseEncodedJSON } from "./encoding.js";
  * @returns {Uint8Array} var bytes of unproven tx ready to be sent to the network
  */
 export function getUnprovenTxVarBytes(wasm, [...bytes]) {
-  const args = JSON.stringify({
+  const args = {
     bytes,
-  });
+  };
 
   return call(wasm, args, "unproven_tx_to_bytes")
     .then(parseEncodedJSON)
@@ -30,10 +30,10 @@ export function getUnprovenTxVarBytes(wasm, [...bytes]) {
  * @returns {Uint8Array} the proven transaction bytes ready to be sent to the network
  */
 export function proveTx(wasm, [...unproven_tx], [...proof]) {
-  const args = JSON.stringify({
+  const args = {
     unproven_tx,
     proof,
-  });
+  };
 
   return call(wasm, args, "prove_tx").then(parseEncodedJSON);
 }

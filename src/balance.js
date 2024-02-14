@@ -37,10 +37,10 @@ export async function getBalance(wasm, seed, psk) {
 
   const serializedNotes = await getNotesRkyvSerialized(wasm, unspentNotes);
 
-  const balanceArgs = JSON.stringify({
+  const balanceArgs = {
     seed: Array.from(seed),
     notes: Array.from(serializedNotes),
-  });
+  };
 
   const obj = await call(wasm, balanceArgs, "balance").then(parseEncodedJSON);
 

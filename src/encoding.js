@@ -31,5 +31,19 @@ export const decode = (buffer, options) => decoder.decode(buffer, options);
  *
  * @returns {Object}
  */
-export const parseEncodedJSON = (buffer, reviver) =>
-  JSON.parse(decode(buffer), reviver);
+export const parseEncodedJSON = (buffer, reviever) =>
+  JSON.parse(decode(buffer), reviever);
+
+/**
+ * Converts a JavaScript value to a JSON string, optionally replacing values
+ * if a replacer function is specified or optionally including only the specified
+ * properties if a replacer array is specified.
+ *
+ * @param {any} value
+ * @param {Function} [replacer]
+ * @param {string|Number} [space]
+ *
+ * @returns {string}
+ */
+export const encodeStringifiedValue = (value, replacer, space) =>
+  encode(JSON.stringify(value, replacer, space));

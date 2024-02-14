@@ -54,47 +54,19 @@ export function HistoryData(psk, history) {
 export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
   try {
     if (localStorage.getItem("lastPos") == null) {
-      console.log("Set last pos in local storage: " + pos);
     }
 
     localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
   } catch (e) {
-    console.error("Cannot set pos in local storage, the wallet will be slow");
+    console.warn("Cannot set pos in local storage, the wallet will be slow");
   }
 
   const db = initializeState();
 
   await db.unspentNotes
     .bulkPut(unspentNotes)
-    .then(() => {
-      if (unspentNotes.length > 0) {
-        console.log("Persisted unspent notes");
-      }
-    })
-    .catch(function (e) {
-      console.error(
-        "Some insert operations did not while pushing unspent notes. " +
-          e.failures.length +
-          " failures",
-      );
-    });
-
-  await db.spentNotes
-    .bulkPut(spentNotes)
-    .then(() => {
-      if (spentNotes.length > 0) {
-        console.log("Persisted spent notes");
-      }
-
-      db.close();
-    })
-    .catch(Dexie.BulkError, function (e) {
-      console.error(
-        "Some insert operations did not while pushing spent notes. " +
-          e.failures.length +
-          " failures",
-      );
-    });
+    .then(() => db.spentNotes.bulkPut(spentNotes))
+    .finally(() => db.close());
 }
 
 /**
@@ -143,34 +115,13 @@ export async function getSpentNotes(psk) {
  * @returns {number} lastPos the position where to fetch from
  * @ignore Only called by the sync function
  */
-export function getLastPos() {
-  try {
-    const lastPos = localStorage.getItem("lastPos");
-
-    if (lastPos == null) {
-      console.warn("Last pos is null, need to sync");
-      return 0;
-    } else {
-      try {
-        // We wanna fetch from the +1 pos if there is an existing last position
-        return parseInt(lastPos);
-      } catch (e) {
-        console.error("Invalid lastPos set");
-        localStorage.removeItem("lastPos");
-
-        return 0;
-      }
-    }
-  } catch (e) {
-    console.error("Cannot retrieve lastPos in local storage", e);
-  }
-}
+export const getLastPos = () => parseInt(localStorage.getItem("lastPos")) || 0;
 
 /**
  * Increment the lastPos by 1 if non zero
  * @returns {number} lastPos the position where to fetch from
  */
-export function getLastPosIncremented() {
+export function getNextPos() {
   const pos = getLastPos();
 
   return pos === 0 ? pos : pos + 1;
@@ -234,7 +185,7 @@ export async function correctNotes(wasm) {
   // get the nullifiers
   const unspentNotesNullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    unspentNotesNullifiers,
+    unspentNotesNullifiers
   );
 
   // Fetch existing nullifiers from the node
@@ -242,8 +193,8 @@ export async function correctNotes(wasm) {
     await request(
       unspentNotesNullifiersSerialized,
       "existing_nullifiers",
-      false,
-    ),
+      false
+    )
   );
 
   // calculate the unspent and spent notes
@@ -255,7 +206,7 @@ export async function correctNotes(wasm) {
     unspentNotesNullifiers,
     unspentNotesBlockHeights,
     unspentNotesExistingNullifiersBytes,
-    unspentNotesPsks,
+    unspentNotesPsks
   );
 
   // These are the spent notes which were unspent before
@@ -278,22 +229,10 @@ export async function insertHistory(historyData) {
   historyData.history = existingHistory.history
     .concat(historyData.history)
     .filter(
-      (v, i, a) =>
-        a.findIndex((v2) => v2.block_height === v.block_height) === i,
+      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
     );
 
-  await db.cache
-    .put(historyData)
-    .then(() => {
-      if (historyData.history.length > 0) {
-        console.log("Persisted history data");
-      }
-    })
-    .catch(function (e) {
-      console.error(
-        "Some insert operations did not while pushing history data. " + e,
-      );
-    });
+  await db.cache.put(historyData);
 }
 
 /**
@@ -317,8 +256,6 @@ export async function clearDB() {
   localStorage.removeItem("lastPsk");
 
   await Dexie.delete("history");
-
-  console.log("clearing");
 
   return Dexie.delete("state");
 }

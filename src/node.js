@@ -8,11 +8,7 @@ import { call } from "./wasm.js";
 import { encode, parseEncodedJSON } from "./encoding.js";
 import { getU64RkyvSerialized, getNullifiersRkyvSerialized } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
-import {
-  insertSpentUnspentNotes,
-  getLastPosIncremented,
-  correctNotes,
-} from "./db.js";
+import { insertSpentUnspentNotes, getNextPos, correctNotes } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
@@ -37,7 +33,7 @@ export function StakeInfo(
   amount,
   reward,
   counter,
-  epoch,
+  epoch
 ) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -64,14 +60,14 @@ export async function sync(wasm, seed, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  const lastPosDB = getLastPosIncremented();
+  const lastPosDB = getNextPos();
   // Get the leafs from the position above
 
   const resp = await request(
     await getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
-    node,
+    node
   );
 
   // contains the chunks of the response, at the end of each iteration
@@ -90,17 +86,23 @@ export async function sync(wasm, seed, node = NODE) {
   const notes = owned.notes;
   const nullifiers = owned.nullifiers;
   const psks = owned.public_spend_keys;
+  // We use number here because currently wallet-core doesn't know
+  // how to parse json with bigInt since there's no specification for BigInt
+  //
+  // FIXME: We should use bigInt
+  //
+  // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
   const blockHeights = owned.block_heights.split(",").map(Number);
   const lastPos = owned.last_pos;
 
   const nullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    nullifiers,
+    nullifiers
   );
 
   // Fetch existing nullifiers from the node
   const existingNullifiersBytes = await responseBytes(
-    await request(nullifiersSerialized, "existing_nullifiers", false),
+    await request(nullifiersSerialized, "existing_nullifiers", false)
   );
 
   const allNotes = await unspentSpentNotes(
@@ -109,7 +111,7 @@ export async function sync(wasm, seed, node = NODE) {
     nullifiers,
     blockHeights,
     existingNullifiersBytes,
-    psks,
+    psks
   );
 
   const unspentNotes = Array.from(allNotes.unspent_notes);
@@ -135,7 +137,7 @@ export function request(
   stream,
   node = NODE,
   target = TRANSFER_CONTRACT,
-  targetType = "1",
+  targetType = "1"
 ) {
   const request_name_bytes = encode(request_name);
   const number = u32toLE(request_name.length);
@@ -185,8 +187,6 @@ export async function fetchOpenings(pos, node = NODE) {
 export async function stakeInfo(wasm, seed, index) {
   const pk = await getPublicKeyRkyvSerialized(wasm, seed, index);
 
-  console.log("Fetching stake info");
-
   const stakeInfoRequest = await responseBytes(
     await request(
       pk,
@@ -194,13 +194,13 @@ export async function stakeInfo(wasm, seed, index) {
       false,
       undefined,
       process.env.STAKE_CONTRACT,
-      "1",
-    ),
+      "1"
+    )
   );
 
-  const args = JSON.stringify({
+  const args = {
     stake_info: Array.from(stakeInfoRequest),
-  });
+  };
 
   const info = await call(wasm, args, "get_stake_info").then(parseEncodedJSON);
 
@@ -212,7 +212,7 @@ export async function stakeInfo(wasm, seed, index) {
     info.reward,
     info.counter,
     // calculating epoch
-    info.eligiblity / 2160,
+    info.eligiblity / 2160
   );
 }
 

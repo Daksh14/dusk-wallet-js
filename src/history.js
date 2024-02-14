@@ -26,7 +26,7 @@ import { duskToLux } from "./crypto.js";
 const maxBlockHeight = (items) =>
   items.reduce(
     (max, { block_height }) => (block_height > max ? block_height : max),
-    0,
+    0
   );
 
 /**
@@ -94,12 +94,12 @@ export async function history(wasm, seed, psk) {
     });
   }
 
-  const args = JSON.stringify({
+  const args = {
     seed: Array.from(seed),
     index: index,
     notes: noteData,
     tx_data: txData,
-  });
+  };
 
   const result = await call(wasm, args, "get_history").then(parseEncodedJSON);
 
@@ -107,7 +107,7 @@ export async function history(wasm, seed, psk) {
     result.history.map(async (tx) => {
       tx.fee = await duskToLux(wasm, parseInt(tx.fee));
       return tx;
-    }),
+    })
   );
 
   const lastBlockHeight = maxBlockHeight(histData);

@@ -4,33 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-const decoder = new TextDecoder();
-const encoder = new TextEncoder();
-
-/**
- * Encodes the string given as Uint8Array.
- *
- * @param {string} String to encode
- * @returns {Uint8Array}
- */
-export const encode = (string) => encoder.encode(string);
-
-/**
- * Decodes the given Uint8Array
- *
- * @param {Uint8Array} Buffer to decode
- * @returns {String}
- */
-export const decode = (buffer, options) => decoder.decode(buffer, options);
-
-/**
- * Decodes the given Uint8Array and parses it as JSON
- *
- * @param {Uint8Array} Buffer to decode
- * @returns {Object}
- */
-export const parseEncodedJSON = (buffer, reviver) =>
-  JSON.parse(decode(buffer), reviver);
+import { encode, encodeStringifiedValue } from "./encoding.js";
 
 /**
  * Decompose a i64 output from a call into the packed pointer, length and sucess bit
@@ -62,7 +36,8 @@ export const call = (wasm, args, function_name) =>
     const { allocate, free_mem } = exports;
 
     const function_call = exports[function_name];
-    const argBytes = encode(args);
+    const argBytes = encodeStringifiedValue(args);
+
     const { byteLength } = argBytes;
     const ptr = await allocate(byteLength);
     await memcpy(ptr, argBytes, byteLength);

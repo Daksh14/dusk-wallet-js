@@ -32,7 +32,7 @@ export async function stake(
   refund,
   amount,
   gasLimit,
-  gasPrice,
+  gasPrice
 ) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
@@ -52,7 +52,7 @@ export async function stake(
     counter = info.counter;
   }
 
-  const args = JSON.stringify({
+  const args = {
     rng_seed: Array.from(rng_seed),
     seed: seed,
     refund: refund,
@@ -60,10 +60,10 @@ export async function stake(
     sender_index: senderIndex,
     gas_limit: gasLimit,
     gas_price: gasPrice,
-  });
+  };
 
   const stctProofArgs = await call(wasm, args, "get_stct_proof").then(
-    parseEncodedJSON,
+    parseEncodedJSON
   );
 
   const stctProofBytes = stctProofArgs.bytes;
@@ -77,27 +77,23 @@ export async function stake(
     false,
     PROVER,
     "rusk",
-    "2",
+    "2"
   );
 
   const bufferStctProofReq = await stctProofReq.arrayBuffer();
 
-  console.log(
-    "stct proof request response length: " + bufferStctProofReq.byteLength,
-  );
-
-  const callDataArgs = JSON.stringify({
+  const callDataArgs = {
     staker_index: senderIndex,
     seed: seed,
     spend_proof: Array.from(new Uint8Array(bufferStctProofReq)),
     value: amount,
     counter: counter,
-  });
+  };
 
   const stakeCallData = await call(
     wasm,
     callDataArgs,
-    "get_stake_call_data",
+    "get_stake_call_data"
   ).then(parseEncodedJSON);
 
   const contract = stakeCallData.contract;
@@ -126,7 +122,7 @@ export async function stake(
     crossoverType,
     fee,
     gasLimit,
-    gasPrice,
+    gasPrice
   );
 }
 
@@ -147,7 +143,7 @@ export async function unstake(
   sender_index,
   refund,
   gasLimit,
-  gasPrice,
+  gasPrice
 ) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
@@ -166,7 +162,7 @@ export async function unstake(
 
   const value = info.amount;
 
-  const args = JSON.stringify({
+  const args = {
     rng_seed: Array.from(rng_seed),
     seed: seed,
     refund: refund,
@@ -174,10 +170,10 @@ export async function unstake(
     sender_index: sender_index,
     gas_limit: gasLimit,
     gas_price: gasPrice,
-  });
+  };
 
   const wfctProofArgs = await call(wasm, args, "get_wfct_proof").then(
-    parseEncodedJSON,
+    parseEncodedJSON
   );
   const wfctProofBytes = wfctProofArgs.bytes;
   const crossover = wfctProofArgs.crossover;
@@ -191,27 +187,23 @@ export async function unstake(
     false,
     PROVER,
     "rusk",
-    "2",
+    "2"
   );
 
   const bufferWfctProofReq = await wfctProofReq.arrayBuffer();
 
-  console.log(
-    "wfct proof request response length: " + bufferWfctProofReq.byteLength,
-  );
-
-  const callDataArgs = JSON.stringify({
+  const callDataArgs = {
     sender_index: sender_index,
     seed: seed,
     unstake_proof: Array.from(new Uint8Array(bufferWfctProofReq)),
     unstake_note: unstakeNote,
     counter: counter,
-  });
+  };
 
   const unstakeCallData = await call(
     wasm,
     callDataArgs,
-    "get_unstake_call_data",
+    "get_unstake_call_data"
   ).then(parseEncodedJSON);
 
   const contract = unstakeCallData.contract;
@@ -240,7 +232,7 @@ export async function unstake(
     crossoverType,
     fee,
     gasLimit,
-    gasPrice,
+    gasPrice
   );
 }
 
@@ -259,7 +251,7 @@ export async function withdrawReward(
   seed,
   staker_index,
   gasLimit,
-  gasPrice,
+  gasPrice
 ) {
   const rng_seed = new Uint8Array(32);
   crypto.getRandomValues(rng_seed);
@@ -271,7 +263,7 @@ export async function withdrawReward(
   // check if reward exists
   if (!info.has_staked || info.reward <= 0) {
     throw new Error(
-      "No reward to withdraw, take part in concensus to recieve reward",
+      "No reward to withdraw, take part in concensus to recieve reward"
     );
   }
   let counter = 0;
@@ -280,7 +272,7 @@ export async function withdrawReward(
     counter = info.counter;
   }
 
-  const args = JSON.stringify({
+  const args = {
     rng_seed: Array.from(rng_seed),
     seed: seed,
     refund: refund,
@@ -289,12 +281,12 @@ export async function withdrawReward(
     counter: counter,
     gas_limit: gasLimit,
     gas_price: gasPrice,
-  });
+  };
 
   const withdrawCallData = await call(
     wasm,
     args,
-    "get_withdraw_call_data",
+    "get_withdraw_call_data"
   ).then(parseEncodedJSON);
 
   const callData = {
@@ -319,6 +311,6 @@ export async function withdrawReward(
     crossoverType,
     withdrawCallData.fee,
     gasLimit,
-    gasPrice,
+    gasPrice
   );
 }

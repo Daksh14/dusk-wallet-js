@@ -14,10 +14,10 @@ import { parseEncodedJSON } from "./encoding.js";
  * @returns {Uint8Array} nullifiers - rkyv serialised nullifiers in a Vector
  */
 export function getNullifiers(wasm, [...seed], [...notes]) {
-  const json = JSON.stringify({
+  const json = {
     seed,
     notes,
-  });
+  };
 
   return call(wasm, json, "nullifiers");
 }
@@ -54,15 +54,15 @@ export function unspentSpentNotes(
   nullifiersOfNote,
   blockHeights,
   existingNullifiers,
-  psks,
+  psks
 ) {
-  const args = JSON.stringify({
+  const args = {
     notes: notes,
     nullifiers_of_notes: nullifiersOfNote,
     block_heights: blockHeights,
     existing_nullifiers: Array.from(existingNullifiers),
     psks: psks,
-  });
+  };
   return call(wasm, args, "unspent_spent_notes").then(parseEncodedJSON);
 }
 
@@ -73,9 +73,9 @@ export function unspentSpentNotes(
  * @returns {Promise<number>} lux amount
  */
 export async function duskToLux(wasm, dusk) {
-  const args = JSON.stringify({
+  const args = {
     dusk: dusk,
-  });
+  };
 
   return parseEncodedJSON(await call(wasm, args, "dusk_to_lux")).lux;
 }
@@ -87,9 +87,9 @@ export async function duskToLux(wasm, dusk) {
  * @returns {number} dusk amount
  */
 export async function luxToDusk(wasm, lux) {
-  const args = JSON.stringify({
+  const args = {
     lux: lux,
-  });
+  };
 
   return parseEncodedJSON(await call(wasm, args, "lux_to_dusk")).dusk;
 }
