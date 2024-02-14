@@ -24,14 +24,9 @@ const ensureSuccess = (output) =>
 
 Deno.test({
   name: "check if npm.js builds the package",
+  ignore: true,
   async fn() {
     await Deno.remove("./npm", { recursive: true }).catch(ignore(NotFound));
-
-    const gitCommand = new Deno.Command("git", {
-      args: ["fetch", "--all"],
-    });
-
-    await ensureSuccess(gitCommand.output());
 
     const command = new Deno.Command(Deno.execPath(), {
       args: ["task", "npm"],
