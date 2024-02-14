@@ -4,14 +4,15 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { getUnpsentNotes } from "./db.js";
+import { getUnspentNotes } from "./db.js";
 import { fetchOpenings, request } from "./node.js";
 import {
   getNotesRkyvSerialized,
   getOpeningsSerialized,
   getU64RkyvSerialized,
 } from "./rkyv.js";
-import { call, jsonFromBytes } from "./wasm.js";
+import { call } from "./wasm.js";
+import { parseEncodedJSON } from "./encoding.js";
 import { getPsks } from "./keys.js";
 import { getUnprovenTxVarBytes, proveTx } from "./tx.js";
 import { waitTillAccept } from "./graphql.js";
@@ -46,9 +47,9 @@ export async function execute(
   gas_limit,
   gas_price
 ) {
-  const sender_index = getPsks(wasm, seed).indexOf(psk);
+  const sender_index = (await getPsks(wasm, seed)).indexOf(psk);
 
-  const notes = await getUnpsentNotes(psk);
+  const notes = await getUnspentNotes(psk);
 
   const openings = [];
   const allNotes = [];
@@ -57,14 +58,16 @@ export async function execute(
 
   for (const noteData of notes) {
     const pos = noteData.pos;
-    const fetchedOpening = await fetchOpenings(getU64RkyvSerialized(wasm, pos));
+    const fetchedOpening = await fetchOpenings(
+      await getU64RkyvSerialized(wasm, pos)
+    );
 
     const opening = Array.from(fetchedOpening);
 
     if (opening.length > 0) {
       openings.push({
-        opening: opening,
-        pos: pos,
+        opening,
+        pos,
       });
     }
 
@@ -73,11 +76,13 @@ export async function execute(
     nullifiers.push(noteData.nullifier);
   }
 
-  const openingsSerialized = Array.from(getOpeningsSerialized(wasm, openings));
+  const openingsSerialized = Array.from(
+    await getOpeningsSerialized(wasm, openings)
+  );
 
-  const inputs = Array.from(getNotesRkyvSerialized(wasm, allNotes));
+  const inputs = Array.from(await getNotesRkyvSerialized(wasm, allNotes));
 
-  const args = JSON.stringify({
+  const args = {
     call: callData,
     crossover: crossover,
     seed: seed,
@@ -90,13 +95,12 @@ export async function execute(
     sender_index: sender_index,
     gas_limit: gas_limit,
     gas_price: gas_price,
-  });
+  };
 
-  const unprovenTx = jsonFromBytes(call(wasm, args, wasm.execute)).tx;
+  const unprovenTx = parseEncodedJSON(await call(wasm, args, "execute")).tx;
 
-  console.log("unrpovenTx length: " + unprovenTx.length);
+  const varBytes = await getUnprovenTxVarBytes(wasm, unprovenTx);
 
-  const varBytes = getUnprovenTxVarBytes(wasm, unprovenTx);
   const proofReq = await request(
     varBytes,
     "prove_execute",
@@ -110,12 +114,10 @@ export async function execute(
     throw new Error("Error while proving the transaction");
   }
 
-  console.log("prove_execute status code: " + proofReq.status);
-
   const buffer = await proofReq.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   // prove and propogate tx
-  const tx = proveTx(wasm, unprovenTx, bytes);
+  const tx = await proveTx(wasm, unprovenTx, bytes);
   const txBytes = tx.bytes;
   const txHash = tx.hash;
 
@@ -128,8 +130,6 @@ export async function execute(
     "2"
   );
 
-  console.log("preverify request status code: " + preVerifyReq.status);
-
   const propogateReq = await request(
     txBytes,
     "propagate_tx",
@@ -138,8 +138,6 @@ export async function execute(
     "Chain",
     "2"
   );
-
-  console.log("propogating chain request status: " + propogateReq.status);
 
   return waitTillAccept(txHash);
 }

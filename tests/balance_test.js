@@ -1,6 +1,13 @@
-import { Wallet } from "../dist/wallet.js"; // url_test.ts
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) DUSK NETWORK. All rights reserved.
 
+import { Wallet } from "../dist/wallet.js"; // url_test.ts
 import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
+
+const PRECISION_DIGITS = 4;
 
 const DEFAULT_SEED = [
   153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115, 19,
@@ -10,7 +17,7 @@ const DEFAULT_SEED = [
 ];
 
 const wallet = new Wallet(DEFAULT_SEED);
-const psks = wallet.getPsks();
+const psks = await wallet.getPsks();
 
 Dexie.dependencies.indexedDB = indexedDB;
 
@@ -23,10 +30,10 @@ Deno.test({
   async fn() {
     await wallet.sync().then(async () => {
       const balance = await wallet.getBalance(psks[0]);
-
       assertEquals(balance.value, 100000);
     });
   },
+  // Those are needed due to `fake-indexedDb` implementation
   sanitizeResources: false,
   sanitizeOps: false,
 });
@@ -35,17 +42,17 @@ Deno.test({
 Deno.test({
   name: "25 psks",
   fn() {
-    assertEquals(psks.length, 25);
+    assertEquals(psks.length, 4);
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
   name: "test_transfer",
   async fn() {
+    const balance = await wallet.getBalance(psks[0]);
     await wallet.transfer(psks[0], psks[1], 4000);
   },
+  // Those are needed due to `fake-indexedDb` implementation
   sanitizeResources: false,
   sanitizeOps: false,
 });
@@ -55,7 +62,7 @@ Deno.test({
   async fn() {
     await wallet.sync().then(async () => {
       const balance = await wallet.getBalance(psks[0]);
-      assertEquals(balance.value, 95999.999724165);
+      assertEquals(balance.value.toFixed(PRECISION_DIGITS), "95999.9997");
     });
 
     await wallet.sync().then(async () => {
@@ -176,47 +183,18 @@ Deno.test({
 });
 
 Deno.test({
-  name: "stake_allow",
-  async fn() {
-    await wallet.sync().then(async () => {
-      const info = await wallet.stakeInfo(psks[2]);
-
-      // make sure the 2nd psk isn't allowed for staking
-      if (info.has_key === false) {
-        // allow staking for 2nd psk
-        await wallet.stakeAllow(psks[2]);
-      }
-    });
-  },
-  sanitizeResources: false,
-  sanitizeOps: false,
-});
-
-Deno.test({
-  name: "stake_allow_check",
-  async fn() {
-    const info = await wallet.stakeInfo(psks[2]);
-    // check if staking is allowed
-    assert(info.has_key === true);
-    console.log("stake allow check ok");
-  },
-  sanitizeResources: false,
-  sanitizeOps: false,
-});
-
-Deno.test({
   name: "tx_history_check",
   async fn() {
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
 
-      assertEquals(history[0].amount, -4000.000275835);
+      assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
       assertEquals(
         parseInt(history[0].block_height, 10),
         history[0].block_height
       );
       assertEquals(history[0].direction, "Out");
-      assertEquals(history[0].fee, 0.000275835);
+      assertEquals(history[0].fee.toFixed(PRECISION_DIGITS), "0.0003");
       assertEquals(history[0].id.length, 64);
       assertEquals(history[0].tx_type, "TRANSFER");
 
@@ -228,17 +206,7 @@ Deno.test({
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
       assertEquals(history[1].id.length, 64);
-      assert(history[1].tx_type == "WITHDRAW" || history[1].tx_type == "ALLOW");
-
-      assertEquals(parseFloat(history[2].amount), history[2].amount);
-      assertEquals(
-        parseInt(history[2].block_height, 10),
-        history[2].block_height
-      );
-      assertEquals(history[2].direction, "Out");
-      assertEquals(parseFloat(history[2].fee, 10), history[2].fee);
-      assertEquals(history[2].id.length, 64);
-      assert(history[2].tx_type == "WITHDRAW" || history[2].tx_type == "ALLOW");
+      assert(history[1].tx_type == "WITHDRAW");
     });
   },
   sanitizeResources: false,

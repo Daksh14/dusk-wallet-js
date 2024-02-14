@@ -1,12 +1,8 @@
-cache
+/cache
+/out
+/npm
+/dist
+/pkg
 
-npm
-out
-
-npm.js
-
-assets/
-
-.DS_Store
-
-pkg/.DS_Store
+**/.DS_Store
+**/*.lock

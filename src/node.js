@@ -4,14 +4,11 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { toBytes, jsonFromBytes, call } from "./wasm.js";
+import { call } from "./wasm.js";
+import { encode, parseEncodedJSON } from "./encoding.js";
 import { getU64RkyvSerialized, getNullifiersRkyvSerialized } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
-import {
-  insertSpentUnspentNotes,
-  getLastPosIncremented,
-  correctNotes,
-} from "./db.js";
+import { insertSpentUnspentNotes, getNextPos, correctNotes } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
@@ -63,11 +60,11 @@ export async function sync(wasm, seed, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  const lastPosDB = getLastPosIncremented();
-
+  const lastPosDB = getNextPos();
   // Get the leafs from the position above
+
   const resp = await request(
-    getU64RkyvSerialized(wasm, lastPosDB),
+    await getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
     node
@@ -75,7 +72,7 @@ export async function sync(wasm, seed, node = NODE) {
 
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
-  const buffer = [];
+  let buffer = [];
 
   for await (const chunk of resp.body) {
     const len = chunk.length;
@@ -85,21 +82,30 @@ export async function sync(wasm, seed, node = NODE) {
     }
   }
 
-  const owned = getOwnedNotes(wasm, seed, buffer);
+  const owned = await getOwnedNotes(wasm, seed, buffer);
   const notes = owned.notes;
   const nullifiers = owned.nullifiers;
   const psks = owned.public_spend_keys;
+  // We use number here because currently wallet-core doesn't know
+  // how to parse json with bigInt since there's no specification for BigInt
+  //
+  // FIXME: We should use bigInt
+  //
+  // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
   const blockHeights = owned.block_heights.split(",").map(Number);
   const lastPos = owned.last_pos;
 
-  const nullifiersSerialized = getNullifiersRkyvSerialized(wasm, nullifiers);
+  const nullifiersSerialized = await getNullifiersRkyvSerialized(
+    wasm,
+    nullifiers
+  );
 
   // Fetch existing nullifiers from the node
   const existingNullifiersBytes = await responseBytes(
     await request(nullifiersSerialized, "existing_nullifiers", false)
   );
 
-  const allNotes = unspentSpentNotes(
+  const allNotes = await unspentSpentNotes(
     wasm,
     notes,
     nullifiers,
@@ -133,17 +139,16 @@ export function request(
   target = TRANSFER_CONTRACT,
   targetType = "1"
 ) {
-  const request_name_bytes = toBytes(request_name);
-  const number = numberToLittleEndianByteArray(request_name.length);
+  const request_name_bytes = encode(request_name);
+  const number = u32toLE(request_name.length);
   const length = number.length + request_name_bytes.length + data.length;
 
   // finalize the bytes we send the node as POST request
-  const request = new Uint8Array(length);
+  const body = new Uint8Array(length);
 
-  request.set(number, 0);
-  request.set(request_name_bytes, number.length);
-  request.set(new Uint8Array(data), number.length + request_name_bytes.length);
-
+  body.set(number, 0);
+  body.set(request_name_bytes, number.length);
+  body.set(new Uint8Array(data), number.length + request_name_bytes.length);
   const headers = {
     "Content-Type": "application/octet-stream",
     "rusk-version": "0.7.0-rc",
@@ -157,8 +162,8 @@ export function request(
 
   return fetch(url, {
     method: "POST",
-    headers: headers,
-    body: request,
+    headers,
+    body,
   });
 }
 
@@ -180,9 +185,7 @@ export async function fetchOpenings(pos, node = NODE) {
  * @returns {StakeInfo} Info about the stake
  */
 export async function stakeInfo(wasm, seed, index) {
-  const pk = getPublicKeyRkyvSerialized(wasm, seed, index);
-
-  console.log("Fetching stake info");
+  const pk = await getPublicKeyRkyvSerialized(wasm, seed, index);
 
   const stakeInfoRequest = await responseBytes(
     await request(
@@ -195,11 +198,11 @@ export async function stakeInfo(wasm, seed, index) {
     )
   );
 
-  const args = JSON.stringify({
+  const args = {
     stake_info: Array.from(stakeInfoRequest),
-  });
+  };
 
-  const info = jsonFromBytes(call(wasm, args, wasm.get_stake_info));
+  const info = await call(wasm, args, "get_stake_info").then(parseEncodedJSON);
 
   return new StakeInfo(
     info.has_key,
@@ -227,12 +230,10 @@ export async function responseBytes(response) {
  * @param {number} number to serialize
  * @returns {Uint8Array} the bytes
  */
-function numberToLittleEndianByteArray(num) {
-  const byteArray = new Uint8Array(4); // Assuming a 32-bit number
+function u32toLE(num) {
+  const data = new Uint8Array(4);
+  const view = new DataView(data.buffer);
+  view.setUint32(0, num, true);
 
-  for (let i = 0; i < 4; i++) {
-    byteArray[i] = (num >> (i * 8)) & 0xff;
-  }
-
-  return byteArray;
+  return data;
 }
