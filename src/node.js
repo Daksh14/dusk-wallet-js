@@ -21,16 +21,6 @@ const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
 
 /**
- * Extend array by another array
- * @param {Array} other_array
- */
-Array.prototype.extend = function (other_array) {
-  other_array.forEach(function (v) {
-    this.push(v);
-  }, this);
-};
-
-/**
  *
  * @param {boolean} has_key If the user has the key in the allow list or not
  * @param {boolean} has_staked If the user has staked before
@@ -47,7 +37,7 @@ export function StakeInfo(
   amount,
   reward,
   counter,
-  epoch
+  epoch,
 ) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -70,7 +60,6 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, node = NODE) {
-  const startTime = performance.now();
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -82,7 +71,7 @@ export async function sync(wasm, seed, node = NODE) {
     await getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
-    node
+    node,
   );
 
   // contains the chunks of the response, at the end of each iteration
@@ -106,12 +95,12 @@ export async function sync(wasm, seed, node = NODE) {
 
   const nullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    nullifiers
+    nullifiers,
   );
 
   // Fetch existing nullifiers from the node
   const existingNullifiersBytes = await responseBytes(
-    await request(nullifiersSerialized, "existing_nullifiers", false)
+    await request(nullifiersSerialized, "existing_nullifiers", false),
   );
 
   const allNotes = await unspentSpentNotes(
@@ -120,17 +109,13 @@ export async function sync(wasm, seed, node = NODE) {
     nullifiers,
     blockHeights,
     existingNullifiersBytes,
-    psks
+    psks,
   );
 
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
   await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
-
-  const endTime = performance.now();
-
-  console.log(`Sync took ${endTime - startTime} milliseconds`);
 
   return correctNotes(wasm);
 }
@@ -150,7 +135,7 @@ export function request(
   stream,
   node = NODE,
   target = TRANSFER_CONTRACT,
-  targetType = "1"
+  targetType = "1",
 ) {
   const request_name_bytes = encode(request_name);
   const number = u32toLE(request_name.length);
@@ -209,8 +194,8 @@ export async function stakeInfo(wasm, seed, index) {
       false,
       undefined,
       process.env.STAKE_CONTRACT,
-      "1"
-    )
+      "1",
+    ),
   );
 
   const args = JSON.stringify({
@@ -227,7 +212,7 @@ export async function stakeInfo(wasm, seed, index) {
     info.reward,
     info.counter,
     // calculating epoch
-    info.eligiblity / 2160
+    info.eligiblity / 2160,
   );
 }
 
