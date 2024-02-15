@@ -45,7 +45,7 @@ export async function execute(
   crossover,
   fee,
   gas_limit,
-  gas_price
+  gas_price,
 ) {
   const sender_index = (await getPsks(wasm, seed)).indexOf(psk);
 
@@ -59,7 +59,7 @@ export async function execute(
   for (const noteData of notes) {
     const pos = noteData.pos;
     const fetchedOpening = await fetchOpenings(
-      await getU64RkyvSerialized(wasm, pos)
+      await getU64RkyvSerialized(wasm, pos),
     );
 
     const opening = Array.from(fetchedOpening);
@@ -77,7 +77,7 @@ export async function execute(
   }
 
   const openingsSerialized = Array.from(
-    await getOpeningsSerialized(wasm, openings)
+    await getOpeningsSerialized(wasm, openings),
   );
 
   const inputs = Array.from(await getNotesRkyvSerialized(wasm, allNotes));
@@ -105,9 +105,10 @@ export async function execute(
     varBytes,
     "prove_execute",
     false,
+    undefined,
     PROVER,
     "rusk",
-    "2"
+    "2",
   );
 
   if (proofReq.status !== 200) {
@@ -126,8 +127,9 @@ export async function execute(
     "preverify",
     false,
     undefined,
+    undefined,
     "rusk",
-    "2"
+    "2",
   );
 
   const propogateReq = await request(
@@ -135,8 +137,9 @@ export async function execute(
     "propagate_tx",
     false,
     undefined,
+    undefined,
     "Chain",
-    "2"
+    "2",
   );
 
   return waitTillAccept(txHash);

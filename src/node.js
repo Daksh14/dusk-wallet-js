@@ -16,6 +16,12 @@ import { path } from "../deps.js";
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
 
+// Return a promised rejected if the signal is aborted, resolved otherwise
+const abortable = (signal) =>
+  new Promise((resolve, rejected) =>
+    signal?.aborted ? reject(signal.reason) : resolve(signal),
+  );
+
 /**
  *
  * @param {boolean} has_key If the user has the key in the allow list or not
@@ -33,7 +39,7 @@ export function StakeInfo(
   amount,
   reward,
   counter,
-  epoch
+  epoch,
 ) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -53,9 +59,21 @@ export function StakeInfo(
  *
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed The seed of the walconst
+ * @param {Object} [options] Options for the sync
+ * @param {String} [node] The node to sync from
+ *
  * @returns {Promise} Promise that resolves when the sync is done
  */
-export async function sync(wasm, seed, node = NODE) {
+export async function sync(wasm, seed, options = {}, node = NODE) {
+  const { signal } = options;
+
+  // if the signal is already aborted, we reject the promise before doing
+  //  anything
+  if (signal?.aborted) {
+    throw signal.reason;
+    return;
+  }
+
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -67,7 +85,8 @@ export async function sync(wasm, seed, node = NODE) {
     await getU64RkyvSerialized(wasm, lastPosDB),
     "leaves_from_pos",
     true,
-    node
+    signal,
+    node,
   );
 
   // contains the chunks of the response, at the end of each iteration
@@ -82,7 +101,9 @@ export async function sync(wasm, seed, node = NODE) {
     }
   }
 
-  const owned = await getOwnedNotes(wasm, seed, buffer);
+  const owned = await abortable(signal).then(() =>
+    getOwnedNotes(wasm, seed, buffer),
+  );
   const notes = owned.notes;
   const nullifiers = owned.nullifiers;
   const psks = owned.public_spend_keys;
@@ -95,29 +116,35 @@ export async function sync(wasm, seed, node = NODE) {
   const blockHeights = owned.block_heights.split(",").map(Number);
   const lastPos = owned.last_pos;
 
-  const nullifiersSerialized = await getNullifiersRkyvSerialized(
-    wasm,
-    nullifiers
+  const nullifiersSerialized = await abortable(signal).then(() =>
+    getNullifiersRkyvSerialized(wasm, nullifiers),
   );
 
   // Fetch existing nullifiers from the node
-  const existingNullifiersBytes = await responseBytes(
-    await request(nullifiersSerialized, "existing_nullifiers", false)
-  );
+  const existingNullifiersBytes = await request(
+    nullifiersSerialized,
+    "existing_nullifiers",
+    false,
+    signal,
+  ).then(responseBytes);
 
-  const allNotes = await unspentSpentNotes(
-    wasm,
-    notes,
-    nullifiers,
-    blockHeights,
-    existingNullifiersBytes,
-    psks
+  const allNotes = await abortable(signal).then(() =>
+    unspentSpentNotes(
+      wasm,
+      notes,
+      nullifiers,
+      blockHeights,
+      existingNullifiersBytes,
+      psks,
+    ),
   );
 
   const unspentNotes = Array.from(allNotes.unspent_notes);
   const spentNotes = Array.from(allNotes.spent_notes);
 
-  await insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos);
+  await abortable(signal).then(() =>
+    insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos),
+  );
 
   return correctNotes(wasm);
 }
@@ -126,18 +153,21 @@ export async function sync(wasm, seed, node = NODE) {
  * @param {Array<Uint8Array>} data Data that is sent with the request
  * @param {string} request_name Name of the request we are performing
  * @param {boolean} stream If you want the response streamed or not
+ * @param {AbortSignal} signal Signal to abort the request
  * @param {string} node Node address, by default CURRENT_NODE
  * @param {string} target target address, by default transfer contract
  * @param {string} targetType the target number in string
+ *
  * @returns {Response} response Result of the fetch
  */
 export function request(
   data,
   request_name,
   stream,
+  signal,
   node = NODE,
   target = TRANSFER_CONTRACT,
-  targetType = "1"
+  targetType = "1",
 ) {
   const request_name_bytes = encode(request_name);
   const number = u32toLE(request_name.length);
@@ -174,7 +204,7 @@ export function request(
  * @returns {Uint8Array} - Bytes of the UInt8Array
  */
 export async function fetchOpenings(pos, node = NODE) {
-  return responseBytes(await request(pos, "opening", false, node));
+  return responseBytes(await request(pos, "opening", false, undefined, node));
 }
 
 /**
@@ -193,9 +223,10 @@ export async function stakeInfo(wasm, seed, index) {
       "get_stake",
       false,
       undefined,
+      undefined,
       process.env.STAKE_CONTRACT,
-      "1"
-    )
+      "1",
+    ),
   );
 
   const args = {
@@ -212,7 +243,7 @@ export async function stakeInfo(wasm, seed, index) {
     info.reward,
     info.counter,
     // calculating epoch
-    info.eligiblity / 2160
+    info.eligiblity / 2160,
   );
 }
 

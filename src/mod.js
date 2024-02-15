@@ -53,10 +53,13 @@ export class Wallet {
 
   /**
    * Sync the wallet
+   *
+   * @param {Object} [options] Options for the sync
+   *
    * @returns {Promise} promise that resolves after the sync is complete
    */
-  sync() {
-    return sync(this.wasm, this.seed);
+  sync(options = {}) {
+    return sync(this.wasm, this.seed, options);
   }
 
   /**
@@ -74,7 +77,7 @@ export class Wallet {
       receiver,
       amount,
       this.gasLimit,
-      this.gasPrice
+      this.gasPrice,
     );
   }
 
@@ -100,7 +103,7 @@ export class Wallet {
 
     if (bal.value < minStake) {
       throw new Error(
-        `Balance needs to be greater than min stake amount of ${minStake}`
+        `Balance needs to be greater than min stake amount of ${minStake}`,
       );
     } else {
       return stake(
@@ -110,7 +113,7 @@ export class Wallet {
         staker,
         amount,
         this.gasLimit,
-        this.gasPrice
+        this.gasPrice,
       );
     }
   }
@@ -158,7 +161,7 @@ export class Wallet {
       index,
       unstaker,
       this.gasLimit,
-      this.gasPrice
+      this.gasPrice,
     );
   }
 
@@ -175,7 +178,7 @@ export class Wallet {
       this.seed,
       index,
       this.gasLimit,
-      this.gasPrice
+      this.gasPrice,
     );
   }
 

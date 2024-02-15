@@ -24,6 +24,29 @@ Dexie.dependencies.indexedDB = indexedDB;
 // clear the Deno localstorage api to start fresh
 localStorage.clear();
 
+Deno.test({
+  name: "test_aborted_sync",
+  async fn() {
+    const controller = new AbortController();
+    controller.abort();
+
+    let synced = false;
+
+    await wallet
+      .sync(controller)
+      .then(() => (synced = true))
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          synced = false;
+        } else {
+          throw e;
+        }
+      });
+
+    assertEquals(synced, false);
+  },
+});
+
 // if balance works with the default node address 0 has 1 million dusk staked
 Deno.test({
   name: "test_balance",
