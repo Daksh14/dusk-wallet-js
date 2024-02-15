@@ -35,6 +35,7 @@ const callable = (cmd) => {
 
 export const cmd = callable([]);
 export const git = callable(["git"]);
+export const cleanTag = clean;
 
 export const tagVersions = () =>
   git

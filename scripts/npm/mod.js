@@ -5,7 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 import { build, emptyDir } from "https://deno.land/x/dnt/mod.ts";
-import { git, tagVersions } from "./cmd.js";
+import { git, tagVersions, cleanTag } from "./cmd.js";
 
 // Clean the `npm` folder
 await emptyDir("./npm");
@@ -41,6 +41,9 @@ if (Deno.args.length) {
 await git.checkout(version);
 
 console.log(`Building NPM package version ${version}`);
+
+// clean the tag version for the package.json
+version = cleanTag(version);
 
 // And finally build the package
 await build({
