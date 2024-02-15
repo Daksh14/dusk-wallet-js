@@ -15,7 +15,15 @@ import { encode } from "./encoding.js";
 export async function graphQLRequest(query) {
   const bytes = encode(query);
 
-  const req = await request(bytes, "gql", false, undefined, "Chain", "2");
+  const req = await request(
+    bytes,
+    "gql",
+    false,
+    undefined,
+    undefined,
+    "Chain",
+    "2",
+  );
 
   const buffer = await req.arrayBuffer();
   const response = new Uint8Array(buffer);
@@ -33,7 +41,7 @@ export async function txStatus(txid, callback) {
   await graphQLRequest(`query { tx(hash: "${txid}") { err }}`).then(
     (response) => {
       callback(response);
-    }
+    },
   );
 }
 
@@ -80,7 +88,7 @@ export function waitTillAccept(txHash) {
 export async function txFromBlock(block_height) {
   const ret = [];
   const txRemote = await graphQLRequest(
-    `query { block(height: ${block_height}) { transactions {id, raw}}}`
+    `query { block(height: ${block_height}) { transactions {id, raw}}}`,
   );
 
   if (
@@ -89,7 +97,7 @@ export async function txFromBlock(block_height) {
   ) {
     for (const tx of txRemote.block.transactions) {
       const spentTx = await graphQLRequest(
-        `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`
+        `query { tx(hash: \"${tx.id}\") { gasSpent, err }}`,
       );
 
       ret.push({
