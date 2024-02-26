@@ -9,7 +9,13 @@ This will be later grafted into js-utils repo
 ```
 ➜ deno task build
 ```
+
 This will create a `dist/wallet.js` which can be used on the frontend side
+
+
+> [!IMPORTANT]
+> The env var `WALLET_CORE_PATH` needs to be set before building the library, the env var points to the web assembly wallet-core the dusk-wallet-js library will use.
+> To compile one on your machine, build https://github.com/dusk-network/wallet-core and use the .wasm
 
 ## Usage
 

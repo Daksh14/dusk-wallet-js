@@ -262,12 +262,6 @@ export async function withdrawReward(
 
   const refund = (await getPsks(wasm, seed))[staker_index];
 
-  // check if reward exists
-  if (!info.has_staked || info.reward <= 0) {
-    throw new Error(
-      "No reward to withdraw, take part in concensus to recieve reward",
-    );
-  }
   let counter = 0;
 
   if (info.counter) {
