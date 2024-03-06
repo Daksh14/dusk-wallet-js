@@ -24,13 +24,16 @@ import { wasmbytecode, exu } from "../deps.js";
  * @property {number} price The gas price of the wallet, default is 1
  */
 export class Gas {
+  static DEFAULT_LIMIT = 2_900_000_000;
+  static DEFAULT_PRICE = 1;
+
   limit = NaN;
   price = NaN;
 
   // Passing null/undefined/0 or negative values will set the default value for price and limit
   constructor({ limit, price } = {}) {
-    this.limit = Math.max(limit, 0) || 2_900_000_000;
-    this.price = Math.max(price, 0) || 1;
+    this.limit = Math.max(limit, 0) || Gas.DEFAULT_LIMIT;
+    this.price = Math.max(price, 0) || Gas.DEFAULT_PRICE;
 
     Object.freeze(this);
   }
@@ -86,6 +89,7 @@ export class Wallet {
    * @param {string} sender bs58 encoded Psk to send the dusk from
    * @param {string} receiver bs68 encoded psk of the address who will receive the Dusk
    * @param {number} amount Amount of DUSK to send
+   * @param {Gas} [gas] Gas settings for the transfer transaction
    * @returns {Promise} promise that resolves after the transfer is accepted into blockchain
    */
   transfer(sender, receiver, amount, gas = new Gas()) {
@@ -104,6 +108,7 @@ export class Wallet {
    * Stake Dusk from the provided psk, refund to the same psk
    * @param {string} staker bs58 encoded Psk to stake from
    * @param {number} amount Amount of dusk to stake
+   * @param {Gas} [gas] Gas settings for the stake transaction
    * @returns {Promise} promise that resolves after the stake is accepted into blockchain
    */
   async stake(staker, amount, gas = new Gas()) {
@@ -165,6 +170,7 @@ export class Wallet {
   /**
    * Unstake dusk from the provided psk, refund to the same psk
    * @param {string} unstaker bs58 encoded psk to unstake from
+   * @param {Gas} [gas] Gas settings for the unstake transaction
    * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
    */
   async unstake(unstaker, gas = new Gas()) {
@@ -180,6 +186,7 @@ export class Wallet {
   /**
    * Withdraw reward
    * @param {string} unstaker bs58 encoded psk to unstake from
+   * @param {Gas} [gas] Gas settings for the withdrawReward transaction
    * @returns {Promise} promise that resolves after the unstake is accepted into blockchain
    */
   async withdrawReward(psk, gas = new Gas()) {

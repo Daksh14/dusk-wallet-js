@@ -278,6 +278,15 @@ Deno.test({
     assertEquals(gas.price, 1);
     assertEquals(gas.limit, 2_900_000_000);
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "check gas price limit",
+  fn() {
+    let newGas = new Gas({ price: 3, limit: 1_230_000_000 });
+    let gas = new Gas(newGas);
+
+    assertEquals(gas.price, 3);
+    assertEquals(gas.limit, 1_230_000_000);
+  },
 });
