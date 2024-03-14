@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-import { Wallet } from "../dist/wallet.js"; // url_test.ts
+import { Wallet, Gas } from "../dist/wallet.js"; // url_test.ts
 import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
 
 const PRECISION_DIGITS = 4;
@@ -214,7 +214,7 @@ Deno.test({
       assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
       assertEquals(
         parseInt(history[0].block_height, 10),
-        history[0].block_height
+        history[0].block_height,
       );
       assertEquals(history[0].direction, "Out");
       assertEquals(history[0].fee.toFixed(PRECISION_DIGITS), "0.0003");
@@ -224,7 +224,7 @@ Deno.test({
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
         parseInt(history[1].block_height, 10),
-        history[1].block_height
+        history[1].block_height,
       );
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
@@ -249,4 +249,44 @@ Deno.test({
   },
   sanitizeResources: false,
   sanitizeOps: false,
+});
+
+Deno.test({
+  name: "null gas price",
+  fn() {
+    let gas = new Gas();
+    assertEquals(gas.price, 1);
+    assertEquals(gas.limit, 2_900_000_000);
+
+    gas = new Gas({ price: 2 });
+
+    assertEquals(gas.price, 2);
+    assertEquals(gas.limit, 2_900_000_000);
+
+    gas = new Gas({ price: 3, limit: null });
+
+    assertEquals(gas.price, 3);
+    assertEquals(gas.limit, 2_900_000_000);
+
+    gas = new Gas({ price: null, limit: 0 });
+
+    assertEquals(gas.price, 1);
+    assertEquals(gas.limit, 2_900_000_000);
+
+    gas = new Gas({ price: -2, limit: -4 });
+
+    assertEquals(gas.price, 1);
+    assertEquals(gas.limit, 2_900_000_000);
+  },
+});
+
+Deno.test({
+  name: "check gas price limit",
+  fn() {
+    let newGas = new Gas({ price: 3, limit: 1_230_000_000 });
+    let gas = new Gas(newGas);
+
+    assertEquals(gas.price, 3);
+    assertEquals(gas.limit, 1_230_000_000);
+  },
 });
