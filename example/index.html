@@ -50,14 +50,14 @@
                 //   memory = exports.memory;
 
                 let wallet = new Wallet(seed);
-                let psks = wallet.getPsks();
+                let psks = await wallet.getPsks();
                 console.log(psks);
 
                 // console.log(getTreeLeafDeserialized(exports, leaf));
 
                 var startTime = performance.now();
 
-                let sync = await wallet.sync();
+                // let sync = await wallet.sync();
 
                 var endTime = performance.now();
 
@@ -67,13 +67,11 @@
 
                 console.log(await wallet.history(psks[0]));
 
-                wallet.reset();
+                // wallet.reset();
+                console.log(await wallet.getNetworkBlockHeight());
 
                 // await wallet.transfer(psks[0], psks[1], 193);
             };
-
-            console.log("test");
-
             initWasm().catch((e) => console.error(e));
         </script>
     </body>

@@ -109,3 +109,15 @@ export async function txFromBlock(block_height) {
 
   return ret;
 }
+
+/**
+ * Get the latest block height from the node
+ * @returns {Promise<number>} - block height
+ */
+export async function latestBlockHeight() {
+  const lastTx = await graphQLRequest(
+    `query { transactions(last: 1) { blockHeight }}`,
+  );
+
+  return new Promise((r) => r(lastTx.transactions[0].blockHeight ?? 0));
+}
