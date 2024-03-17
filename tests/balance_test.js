@@ -294,13 +294,9 @@ Deno.test({
 Deno.test({
   name: "check latest network block height",
   async fn() {
-    const blockHeight = await wallet.getNetworkBlockHeight();
+    const blockHeight = await Wallet.getNetworkBlockHeight();
 
-    // sanity check
     assert(!isNaN(blockHeight));
-    // sanity check
     assert(blockHeight > 10);
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });

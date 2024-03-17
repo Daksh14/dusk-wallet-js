@@ -57,7 +57,7 @@
 
                 var startTime = performance.now();
 
-                // let sync = await wallet.sync();
+                let sync = await wallet.sync();
 
                 var endTime = performance.now();
 
@@ -67,7 +67,7 @@
 
                 console.log(await wallet.history(psks[0]));
 
-                // wallet.reset();
+                wallet.reset();
                 console.log(await wallet.getNetworkBlockHeight());
 
                 // await wallet.transfer(psks[0], psks[1], 193);

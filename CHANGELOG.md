@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add the `Gas` class
 - Add the `getNetworkBlockHeight` method for the `Wallet` class
-- Add tests for the new `getNetworkBlockHeight` method
 
 ### Removed
 
