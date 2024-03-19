@@ -228,7 +228,7 @@ export class Wallet {
    * Get the network block height
    * @returns {Promise<number>} The network block height
    */
-  static networkBlockHeight() {
+  static get networkBlockHeight() {
     return getNetworkBlockHeight();
   }
 }
