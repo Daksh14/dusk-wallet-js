@@ -215,16 +215,6 @@ export class Wallet {
   }
 
   /**
-   * Convert the given block height to last position
-   *
-   * @param {number} blockHeight The block height to convert
-   * @returns {number} The last position
-   */
-  #blockHeightToLastPos(blockHeight) {
-    return blockHeightToLastPos(this.wasm, blockHeight);
-  }
-
-  /**
    * Get the network block height
    * @returns {Promise<number>} The network block height
    */
