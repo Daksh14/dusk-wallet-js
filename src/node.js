@@ -15,6 +15,7 @@ import { path } from "../deps.js";
 // env variables
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
 const NODE = process.env.CURRENT_NODE;
+const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 
 // Return a promised rejected if the signal is aborted, resolved otherwise
 const abortable = (signal) =>
@@ -254,6 +255,44 @@ export async function stakeInfo(wasm, seed, index) {
  */
 export async function responseBytes(response) {
   return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * Helper function to convert a block height to last position
+ * @param {Exu.module} wasm
+ * @param {Uint8Array} seed
+ * @param {number} blockHeight The block height
+ * @param {string} [node] The node address
+ */
+export async function blockHeightToLastPos(
+  wasm,
+  seed,
+  blockHeight,
+  node = NODE,
+) {
+  const resp = await request(
+    await getU64RkyvSerialized(wasm, blockHeight),
+    "leaves_from_height",
+    true,
+    undefined,
+    node,
+  );
+
+  let firstNote = [];
+
+  for await (const chunk of resp.body) {
+    firstNote = chunk.slice(0, RKYV_TREE_LEAF_SIZE);
+
+    break;
+  }
+
+  if (!firstNote.length) {
+    return new Error(`No notes found at the block height: ${blockHeight}`);
+  }
+
+  const { last_pos } = await getOwnedNotes(wasm, seed, firstNote);
+
+  return lastPos;
 }
 
 /**

@@ -115,6 +115,6 @@ export async function txFromBlock(block_height) {
  * @returns {Promise<number>} - block height
  */
 export const getNetworkBlockHeight = () =>
-  graphQLRequest(`query { block(height: -1) { header { height } }}`).then(
+  graphQLRequest("query { block(height: -1) { header { height } }}").then(
     (tx) => tx.block.header.height ?? 0,
   );
