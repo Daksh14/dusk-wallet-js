@@ -66,7 +66,7 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, options = {}, node = NODE) {
-  const { signal } = options;
+  const { signal, blockHeight } = options;
 
   // if the signal is already aborted, we reject the promise before doing
   //  anything
@@ -79,11 +79,15 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  const lastPosDB = getNextPos();
-  // Get the leafs from the position above
+  let position = getNextPos();
 
+  if (blockHeight) {
+    position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
+  }
+
+  // Get the leafs from the position above
   const resp = await request(
-    await getU64RkyvSerialized(wasm, lastPosDB),
+    await getU64RkyvSerialized(wasm, position),
     "leaves_from_pos",
     true,
     signal,
