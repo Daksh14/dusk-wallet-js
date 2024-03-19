@@ -128,6 +128,20 @@ export function getNextPos() {
 }
 
 /**
+ * Set the lastPos in the localStorage, errors if one is already there
+ * @param {number} position the position to set
+ */
+export function setNextPos(position) {
+  const existingPosition = localStorage.getItem("lastPos");
+
+  if (existingPosition === null) {
+    throw new Error("lastPos already exists");
+  }
+
+  localStorage.setItem("lastPos", position);
+}
+
+/**
  * Given bs58 encoded psk, fetch all the spent and unspent notes for that psk
  *
  * @param {string} psk
@@ -206,7 +220,7 @@ export async function correctNotes(wasm) {
     unspentNotesNullifiers,
     unspentNotesBlockHeights,
     unspentNotesExistingNullifiersBytes,
-    unspentNotesPsks
+    unspentNotesPsks,
   );
 
   // These are the spent notes which were unspent before
