@@ -257,6 +257,38 @@ export async function responseBytes(response) {
 }
 
 /**
+ * Helper function to convert a block height to last position
+ * @param {number} blockHeight The block height
+ */
+export async function blockHeightToLastPos(wasm, blockHeight, node = NODE) {
+  const resp = await request(
+    await getU64RkyvSerialized(wasm, blockHeight),
+    "leaves_from_height",
+    true,
+    undefined,
+    node,
+  );
+
+  const dummySeed = new Uint8Array(64);
+  let firstNote = [];
+
+  for await (const chunk of resp.body) {
+    firstNote = chunk.slice(0, 632);
+
+    break;
+  }
+
+  if (!firstNote.length) {
+    return new Error("No notes found at this block height.", blockHeight);
+  }
+
+  const note = await getOwnedNotes(wasm, dummySeed, firstNote);
+  const lastPos = note.last_pos;
+
+  return lastPos;
+}
+
+/**
  * Seerialize a number to a little endian byte array
  * @param {number} number to serialize
  * @returns {Uint8Array} the bytes
