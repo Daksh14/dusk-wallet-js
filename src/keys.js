@@ -29,7 +29,7 @@ export async function getPsks(wasm, seed) {
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed Seed of the walconst
  * @param {number} index Index of the public spend key
- * @returns {Uint8Array} public_key rkyv serialized
+ * @returns {Promise<Uint8Array>} public_key rkyv serialized
  */
 export function getPublicKeyRkyvSerialized(wasm, [...seed], index) {
   const json = {

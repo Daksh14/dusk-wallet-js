@@ -109,3 +109,12 @@ export async function txFromBlock(block_height) {
 
   return ret;
 }
+
+/**
+ * Get the latest block height from the node
+ * @returns {Promise<number>} - block height
+ */
+export const getNetworkBlockHeight = () =>
+  graphQLRequest(`query { block(height: -1) { header { height } }}`).then(
+    (tx) => tx.block.header.height ?? 0,
+  );

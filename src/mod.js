@@ -12,6 +12,7 @@ import { sync, stakeInfo } from "./node.js";
 import { stake, unstake, withdrawReward } from "./contracts/stake.js";
 import { history } from "./history.js";
 import { clearDB } from "./db.js";
+import { getNetworkBlockHeight } from "./graphql.js";
 
 import { wasmbytecode, exu } from "../deps.js";
 
@@ -211,5 +212,13 @@ export class Wallet {
    */
   reset() {
     return clearDB();
+  }
+
+  /**
+   * Get the network block height
+   * @returns {Promise<number>} The network block height
+   */
+  static get networkBlockHeight() {
+    return getNetworkBlockHeight();
   }
 }

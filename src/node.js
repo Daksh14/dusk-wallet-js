@@ -158,7 +158,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
  * @param {string} target target address, by default transfer contract
  * @param {string} targetType the target number in string
  *
- * @returns {Response} response Result of the fetch
+ * @returns {Promise<Response>} response Result of the fetch
  */
 export function request(
   data,
@@ -181,7 +181,7 @@ export function request(
   body.set(new Uint8Array(data), number.length + request_name_bytes.length);
   const headers = {
     "Content-Type": "application/octet-stream",
-    "rusk-version": "0.7.0-rc",
+    "rusk-version": "0.7.0",
   };
 
   if (stream) {
