@@ -158,7 +158,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
  * @param {string} target target address, by default transfer contract
  * @param {string} targetType the target number in string
  *
- * @returns {Response} response Result of the fetch
+ * @returns {Promise<Response>} response Result of the fetch
  */
 export function request(
   data,

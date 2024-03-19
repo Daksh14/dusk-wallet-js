@@ -12,7 +12,7 @@ import { parseEncodedJSON } from "./encoding.js";
  * Convert a number to rkyv serialized bytes
  * @param {WebAssembly.Exports} wasm
  * @param {number} value we want to rkyv serialize
- * @returns {Uint8Array} rkyv serialized bytes of the u64
+ * @returns {Promise<Uint8Array>} rkyv serialized bytes of the u64
  */
 export function getU64RkyvSerialized(wasm, value) {
   const args = {
