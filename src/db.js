@@ -131,7 +131,7 @@ export function getNextPos() {
  * Set the lastPos in the localStorage, errors if one is already there
  * @param {number} position the position to set
  */
-export function setNextPos(position) {
+export function setLastPos(position) {
   const existingPosition = localStorage.getItem("lastPos");
 
   if (existingPosition !== null) {

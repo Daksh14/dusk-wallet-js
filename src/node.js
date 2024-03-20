@@ -12,7 +12,7 @@ import {
   insertSpentUnspentNotes,
   getNextPos,
   correctNotes,
-  setNextPos,
+  setLastPos,
 } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
@@ -86,10 +86,10 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // starts to store its notes from
   let position;
 
-  if (from) {
+  if (typeof from === "number") {
     position = await blockHeightToLastPos(wasm, seed, from, node);
     // persist the provided position retrieved from the block height
-    setNextPos(position);
+    setLastPos(position);
   } else {
     position = getNextPos();
   }
