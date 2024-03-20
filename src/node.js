@@ -8,7 +8,12 @@ import { call } from "./wasm.js";
 import { encode, parseEncodedJSON } from "./encoding.js";
 import { getU64RkyvSerialized, getNullifiersRkyvSerialized } from "./rkyv.js";
 import { getPublicKeyRkyvSerialized } from "./keys.js";
-import { insertSpentUnspentNotes, getNextPos, correctNotes } from "./db.js";
+import {
+  insertSpentUnspentNotes,
+  getNextPos,
+  correctNotes,
+  setLastPos,
+} from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
 
@@ -66,7 +71,7 @@ export function StakeInfo(
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, options = {}, node = NODE) {
-  const { signal } = options;
+  const { signal, from } = options;
 
   // if the signal is already aborted, we reject the promise before doing
   //  anything
@@ -79,11 +84,19 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  const lastPosDB = getNextPos();
-  // Get the leafs from the position above
+  let position;
 
+  if (typeof from === "number") {
+    position = await blockHeightToLastPos(wasm, seed, from, node);
+    // persist the provided position retrieved from the block height
+    setLastPos(position);
+  } else {
+    position = getNextPos();
+  }
+
+  // Get the leafs from the position above
   const resp = await request(
-    await getU64RkyvSerialized(wasm, lastPosDB),
+    await getU64RkyvSerialized(wasm, position),
     "leaves_from_pos",
     true,
     signal,

@@ -128,6 +128,22 @@ export function getNextPos() {
 }
 
 /**
+ * Set the lastPos in the localStorage, errors if one is already there
+ * @param {number} position the position to set
+ */
+export function setLastPos(position) {
+  const existingPosition = localStorage.getItem("lastPos");
+
+  if (existingPosition !== null) {
+    throw new Error(
+      `Storage: Expected "lastPos" to be empty. Found value "${existingPosition}" instead.`,
+    );
+  }
+
+  localStorage.setItem("lastPos", position);
+}
+
+/**
  * Given bs58 encoded psk, fetch all the spent and unspent notes for that psk
  *
  * @param {string} psk
@@ -185,7 +201,7 @@ export async function correctNotes(wasm) {
   // get the nullifiers
   const unspentNotesNullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    unspentNotesNullifiers
+    unspentNotesNullifiers,
   );
 
   // Fetch existing nullifiers from the node
@@ -193,8 +209,8 @@ export async function correctNotes(wasm) {
     await request(
       unspentNotesNullifiersSerialized,
       "existing_nullifiers",
-      false
-    )
+      false,
+    ),
   );
 
   // calculate the unspent and spent notes
@@ -206,7 +222,7 @@ export async function correctNotes(wasm) {
     unspentNotesNullifiers,
     unspentNotesBlockHeights,
     unspentNotesExistingNullifiersBytes,
-    unspentNotesPsks
+    unspentNotesPsks,
   );
 
   // These are the spent notes which were unspent before
@@ -229,7 +245,8 @@ export async function insertHistory(historyData) {
   historyData.history = existingHistory.history
     .concat(historyData.history)
     .filter(
-      (v, i, a) => a.findIndex((v2) => v2.block_height === v.block_height) === i
+      (v, i, a) =>
+        a.findIndex((v2) => v2.block_height === v.block_height) === i,
     );
 
   await db.cache.put(historyData);
