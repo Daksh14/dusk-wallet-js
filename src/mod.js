@@ -8,7 +8,7 @@ import { getPsks } from "./keys.js";
 import { duskToLux } from "./crypto.js";
 import { getBalance } from "./balance.js";
 import { transfer } from "./contracts/transfer.js";
-import { sync, stakeInfo, blockHeightToLastPos } from "./node.js";
+import { sync, stakeInfo, blockHeightToLastPos, SyncOptions } from "./node.js";
 import { stake, unstake, withdrawReward } from "./contracts/stake.js";
 import { history } from "./history.js";
 import { clearDB } from "./db.js";
@@ -77,11 +77,11 @@ export class Wallet {
   /**
    * Sync the wallet
    *
-   * @param {Object} [options] Options for the sync
+   * @param {SyncOptions} [options] Options for the sync
    *
    * @returns {Promise} promise that resolves after the sync is complete
    */
-  sync(options = {}) {
+  sync(options = new SyncOptions()) {
     return sync(this.wasm, this.seed, options);
   }
 

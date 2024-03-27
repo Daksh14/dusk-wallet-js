@@ -57,6 +57,20 @@ export function StakeInfo(
 }
 
 /**
+ * Options for the sync function
+ * @typedef {Object} SyncOptions
+ * @property {AbortSignal} signal The signal to abort the sync
+ * @property {number} from The block height to start syncing from
+ * @property {function} syncedAtHeightFn callback called with the block height when the function is done
+ */
+export class SyncOptions {
+  constructor(signal, from, syncedAtHeightFn) {
+    this.signal = signal;
+    this.from = from;
+  }
+}
+
+/**
  * This the most expensive function in this library,
  * This function fetches the notes and then persists them
  * to the indexed DB
@@ -65,12 +79,17 @@ export function StakeInfo(
  *
  * @param {WebAssembly.Exports} wasm
  * @param {Uint8Array} seed The seed of the walconst
- * @param {Object} [options] Options for the sync
+ * @param {SyncOptions} [options] Options for the sync
  * @param {String} [node] The node to sync from
  *
  * @returns {Promise} Promise that resolves when the sync is done
  */
-export async function sync(wasm, seed, options = {}, node = NODE) {
+export async function sync(
+  wasm,
+  seed,
+  options = new SyncOptions(),
+  node = NODE,
+) {
   const { signal, from } = options;
 
   // if the signal is already aborted, we reject the promise before doing
@@ -305,7 +324,13 @@ export async function blockHeightToLastPos(
 
   const { last_pos } = await getOwnedNotes(wasm, seed, firstNote);
 
-  return lastPos;
+  if (last_pos) {
+    // Decrement last pos by one to be safe, its okay to fetch an extra position for
+    // correctness reasons
+    return last_pos - 1;
+  } else {
+    throw new Error("No last position found");
+  }
 }
 
 /**

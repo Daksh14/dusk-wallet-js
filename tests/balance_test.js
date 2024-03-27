@@ -205,21 +205,23 @@ Deno.test({
   sanitizeOps: false,
 });
 
+let block_height_tx_start = 0;
+
 Deno.test({
   name: "tx_history_check",
   async fn() {
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
+      const firstHeight = parseInt(history[0].block_height, 10);
+      block_height_tx_start = firstHeight;
 
       assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
-      assertEquals(
-        parseInt(history[0].block_height, 10),
-        history[0].block_height,
-      );
+      assertEquals(firstHeight, history[0].block_height);
       assertEquals(history[0].direction, "Out");
       assertEquals(history[0].fee.toFixed(PRECISION_DIGITS), "0.0003");
       assertEquals(history[0].id.length, 64);
       assertEquals(history[0].tx_type, "TRANSFER");
+      console.log(history[1].amount);
 
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
@@ -246,6 +248,22 @@ Deno.test({
     const exists = await Dexie.exists("state");
 
     assert(!exists);
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "test sync from particular block height",
+  async fn() {
+    let syncOptions = {
+      from: block_height_tx_start,
+    };
+
+    await wallet.sync(syncOptions).then(async () => {
+      const history = await wallet.history(psks[0]);
+      assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
+    });
   },
   sanitizeResources: false,
   sanitizeOps: false,
