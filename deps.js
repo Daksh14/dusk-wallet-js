@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
-import { Dexie } from "https://unpkg.com/dexie/dist/dexie.mjs";
+import { Dexie } from "https://unpkg.com/dexie@3.2.7/dist/dexie.mjs";
 import { indexedDB } from "npm:fake-indexeddb";
 import {
   assertEquals,
