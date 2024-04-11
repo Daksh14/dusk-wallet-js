@@ -61,14 +61,7 @@ export function StakeInfo(
  * @typedef {Object} SyncOptions
  * @property {AbortSignal} signal The signal to abort the sync
  * @property {number} from The block height to start syncing from
- * @property {function} syncedAtHeightFn callback called with the block height when the function is done
  */
-export class SyncOptions {
-  constructor(signal, from, syncedAtHeightFn) {
-    this.signal = signal;
-    this.from = from;
-  }
-}
 
 /**
  * This the most expensive function in this library,
@@ -84,12 +77,7 @@ export class SyncOptions {
  *
  * @returns {Promise} Promise that resolves when the sync is done
  */
-export async function sync(
-  wasm,
-  seed,
-  options = new SyncOptions(),
-  node = NODE,
-) {
+export async function sync(wasm, seed, options = {}, node = NODE) {
   const { signal, from } = options;
 
   // if the signal is already aborted, we reject the promise before doing
