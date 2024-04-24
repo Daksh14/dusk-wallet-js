@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add the `from` method to sync from a particlar blockHeight
 - Add the `Gas` class
 - Add the `getNetworkBlockHeight` method for the `Wallet` class
 - Add the `blockHeightToLastPos` internal method
