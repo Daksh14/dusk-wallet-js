@@ -77,7 +77,7 @@ export class Wallet {
   /**
    * Sync the wallet
    *
-   * @param {Object} [options] Options for the sync
+   * @param {SyncOptions} [options] Options for the sync
    *
    * @returns {Promise} promise that resolves after the sync is complete
    */

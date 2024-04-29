@@ -205,17 +205,18 @@ Deno.test({
   sanitizeOps: false,
 });
 
+let block_height_tx_start = 0;
+
 Deno.test({
   name: "tx_history_check",
   async fn() {
     await wallet.sync().then(async () => {
       const history = await wallet.history(psks[0]);
+      const firstHeight = parseInt(history[0].block_height, 10);
+      block_height_tx_start = firstHeight;
 
       assertEquals(history[0].amount.toFixed(PRECISION_DIGITS), "-4000.0003");
-      assertEquals(
-        parseInt(history[0].block_height, 10),
-        history[0].block_height,
-      );
+      assertEquals(firstHeight, history[0].block_height);
       assertEquals(history[0].direction, "Out");
       assertEquals(history[0].fee.toFixed(PRECISION_DIGITS), "0.0003");
       assertEquals(history[0].id.length, 64);
@@ -246,6 +247,60 @@ Deno.test({
     const exists = await Dexie.exists("state");
 
     assert(!exists);
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+const transactions = {};
+
+Deno.test({
+  name: "create dummy transactions",
+  async fn() {
+    await wallet.sync().then(async () => {
+      await wallet.transfer(psks[0], psks[1], 2000).then(async () => {
+        await wallet.sync().then(async () => {
+          await wallet.transfer(psks[0], psks[1], 3000).then(async () => {
+            await wallet.sync().then(async () => {
+              await wallet.transfer(psks[0], psks[1], 5000);
+            });
+          });
+        });
+      });
+    });
+
+    await wallet.sync().then(async () => {
+      const history = await wallet.history(psks[0]);
+
+      for (const tx of history) {
+        transactions[tx.id] = {
+          amount: tx.amount,
+          block_height: tx.block_height,
+        };
+      }
+    });
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "test sync from particular block height",
+  async fn() {
+    await wallet.reset();
+
+    const block_height = Object.values(transactions)[2].block_height;
+
+    let syncOptions = {
+      from: block_height,
+    };
+
+    await wallet.sync(syncOptions).then(async () => {
+      const history = await wallet.history(psks[0]);
+      assertEquals(history[0].block_height, block_height);
+      assertEquals(history[1].amount.toFixed(PRECISION_DIGITS), "-3000.0003");
+      assertEquals(history[2].amount.toFixed(PRECISION_DIGITS), "-5000.0003");
+    });
   },
   sanitizeResources: false,
   sanitizeOps: false,

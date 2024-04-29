@@ -59,7 +59,7 @@ await build({
     },
     "https://unpkg.com/dexie/dist/dexie.mjs": {
       name: "dexie",
-      version: "3.2.4",
+      version: "3.2.7",
     },
   },
   shims: [],
