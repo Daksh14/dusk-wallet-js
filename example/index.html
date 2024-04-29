@@ -56,8 +56,12 @@
                 // console.log(getTreeLeafDeserialized(exports, leaf));
 
                 var startTime = performance.now();
+                const network = await Wallet.networkBlockHeight;
+                console.log(network);
 
-                let sync = await wallet.sync();
+                let sync = await wallet.sync({
+                    from: network,
+                });
 
                 var endTime = performance.now();
 
