@@ -47,8 +47,6 @@ export class Gas {
  * @class Wallet
  * @type {Object}
  * @property {Uint8Array} seed The seed of the wallet
- * @property {number} [gasLimit] The gas limit of the wallet, default is 2900000000
- * @property {number} [gasPrice] The gas price of the wallet, default is 1
  */
 export class Wallet {
   constructor(seed) {
