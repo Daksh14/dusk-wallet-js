@@ -318,9 +318,9 @@ export async function blockHeightToLastPos(
     // Decrement last pos by one to be safe, its okay to fetch an extra position for
     // correctness reasons
     return last_pos - 1;
-  } else {
-    return 0;
   }
+
+  return 0;
 }
 
 /**
