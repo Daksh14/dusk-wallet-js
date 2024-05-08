@@ -13,6 +13,7 @@ import {
   getNextPos,
   correctNotes,
   setLastPos,
+  lastPosExists,
 } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
@@ -94,6 +95,11 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   let position;
 
   if (typeof from === "number") {
+    if (lastPosExists()) {
+      throw new Error(
+        "Last position already exists, please clear the cache first",
+      );
+    }
     position = await blockHeightToLastPos(wasm, seed, from, node);
     // persist the provided position retrieved from the block height
     setLastPos(position);
@@ -306,19 +312,15 @@ export async function blockHeightToLastPos(
     break;
   }
 
-  if (!firstNote.length) {
-    return new Error(`No notes found at the block height: ${blockHeight}`);
-  }
-
   const { last_pos } = await getOwnedNotes(wasm, seed, firstNote);
 
   if (last_pos) {
     // Decrement last pos by one to be safe, its okay to fetch an extra position for
     // correctness reasons
     return last_pos - 1;
-  } else {
-    throw new Error("No last position found");
   }
+
+  return 0;
 }
 
 /**

@@ -128,20 +128,17 @@ export function getNextPos() {
 }
 
 /**
- * Set the lastPos in the localStorage, errors if one is already there
+ * Set the lastPos in the localStorage
  * @param {number} position the position to set
  */
 export function setLastPos(position) {
-  const existingPosition = localStorage.getItem("lastPos");
-
-  if (existingPosition !== null) {
-    throw new Error(
-      `Storage: Expected "lastPos" to be empty. Found value "${existingPosition}" instead.`,
-    );
-  }
-
   localStorage.setItem("lastPos", position);
 }
+
+/**
+ * Check if the last position exists in the localstorage
+ */
+export const lastPosExists = () => localStorage.getItem("lastPos") > 0;
 
 /**
  * Given bs58 encoded psk, fetch all the spent and unspent notes for that psk
