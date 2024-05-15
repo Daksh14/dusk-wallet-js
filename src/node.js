@@ -106,7 +106,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // starts to store its notes from
   let position = getNextPos();
 
-  const lastPosExists = lastPosExists();
+  const currentlastPos = lastPosExists();
 
   if (typeof from === "number") {
     if (from <= 0) {
@@ -117,7 +117,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       // point 4 and 5, sync from getNextPos() if position doesn't exist
     } else {
       // point 7
-      if (!lastPosExists) {
+      if (!currentlastPos) {
         const blockHeight = Math.max(
           0,
           Math.min(from, await getNetworkBlockHeight()),
@@ -131,7 +131,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   } else {
     // skip sync if last position doesn't exist and no block height is provided
     // point 1
-    if (!lastPosExists) {
+    if (!currentlastPos) {
       return;
     } else {
       // point 2 and 3. Sync from cache's last position

@@ -51,7 +51,7 @@ Deno.test({
 Deno.test({
   name: "test_balance",
   async fn() {
-    await wallet.sync().then(async () => {
+    await wallet.sync({ from: 0 }).then(async () => {
       const balance = await wallet.getBalance(psks[0]);
       assertEquals(balance.value, 100000);
     });
@@ -257,7 +257,7 @@ const transactions = {};
 Deno.test({
   name: "create dummy transactions",
   async fn() {
-    await wallet.sync().then(async () => {
+    await wallet.sync({ from: 0 }).then(async () => {
       await wallet.transfer(psks[0], psks[1], 2000).then(async () => {
         await wallet.sync().then(async () => {
           await wallet.transfer(psks[0], psks[1], 3000).then(async () => {
