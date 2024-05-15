@@ -138,7 +138,7 @@ export function setLastPos(position) {
 /**
  * Check if the last position exists in the localstorage
  */
-export const lastPosExists = () => localStorage.getItem("lastPos") > 0;
+export const lastPosExists = () => localStorage.getItem("lastPos") !== null;
 
 /**
  * Given bs58 encoded psk, fetch all the spent and unspent notes for that psk
