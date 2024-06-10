@@ -61,11 +61,10 @@ export function StakeInfo(
 /**
  * Error for when a the sync is being called without clearing the cache
  */
-class ClearCacheBeforeSync extends Error {
-  constructor() {
-    let message = "Clear cache before syncing";
-    super(message);
-    this.message = message;
+class SyncError extends Error {
+  constructor(msg) {
+    super(msg);
+    this.name = this.constructor.name;
   }
 }
 
@@ -105,14 +104,16 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
   let position = getNextPos();
-
+  // the points are from the github issue https://github.com/dusk-network/dusk-wallet-js/issues/93#issuecomment-2107632916
   const currentlastPos = lastPosExists();
 
   if (typeof from === "number") {
     if (from <= 0) {
       if (position > 0) {
         // point 6 throw error if position exists and we're trying to sync from 0
-        throw new ClearCacheBeforeSync();
+        throw new SyncError(
+          `Cannot sync from block height ${from} with an existing cache`,
+        );
       }
       // point 4 and 5, sync from getNextPos() if position doesn't exist
     } else {
@@ -125,7 +126,9 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
         position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
       } else {
-        throw new ClearCacheBeforeSync();
+        throw new SyncError(
+          `Cannot sync from block height ${from} with an existing cache`,
+        );
       }
     }
   } else {
