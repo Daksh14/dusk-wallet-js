@@ -17,6 +17,7 @@ import {
 } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
+import { getNetworkBlockHeight } from "./graphql.js";
 
 // env variables
 const TRANSFER_CONTRACT = process.env.TRANSFER_CONTRACT;
@@ -58,6 +59,16 @@ export function StakeInfo(
 }
 
 /**
+ * Error for when a the sync is being called without clearing the cache
+ */
+class SyncError extends Error {
+  constructor(msg) {
+    super(msg);
+    this.name = this.constructor.name;
+  }
+}
+
+/**
  * Options for the sync function
  * @typedef {Object} SyncOptions
  * @property {AbortSignal} signal The signal to abort the sync
@@ -92,19 +103,43 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
   // starts to store its notes from
-  let position;
+  let position = getNextPos();
+  // the points are from the github issue https://github.com/dusk-network/dusk-wallet-js/issues/93#issuecomment-2107632916
+  const currentlastPos = lastPosExists();
 
   if (typeof from === "number") {
-    if (lastPosExists()) {
-      throw new Error(
-        "Last position already exists, please clear the cache first",
-      );
+    if (from <= 0) {
+      if (position > 0) {
+        // point 6 throw error if position exists and we're trying to sync from 0
+        throw new SyncError(
+          `Cannot sync from block height ${from} with an existing cache`,
+        );
+      }
+      // point 4 and 5, sync from getNextPos() if position doesn't exist
+    } else {
+      // point 7
+      if (!currentlastPos) {
+        const blockHeight = Math.max(
+          0,
+          Math.min(from, await getNetworkBlockHeight()),
+        );
+
+        position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
+      } else {
+        throw new SyncError(
+          `Cannot sync from block height ${from} with an existing cache`,
+        );
+      }
     }
-    position = await blockHeightToLastPos(wasm, seed, from, node);
-    // persist the provided position retrieved from the block height
-    setLastPos(position);
   } else {
-    position = getNextPos();
+    // skip sync if last position doesn't exist and no block height is provided
+    // point 1
+    if (!currentlastPos) {
+      return;
+    } else {
+      // point 2 and 3. Sync from cache's last position
+      position = getNextPos();
+    }
   }
 
   // Get the leafs from the position above
