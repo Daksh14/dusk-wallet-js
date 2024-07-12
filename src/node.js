@@ -135,6 +135,10 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     // skip sync if last position doesn't exist and no block height is provided
     // point 1
     if (!currentlastPos) {
+      // set the last position to the current position in the network
+      const currentPosition = await num_notes();
+      setLastPos(Number(currentPosition));
+
       return;
     } else {
       // point 2 and 3. Sync from cache's last position
@@ -210,6 +214,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
   return correctNotes(wasm);
 }
+
 /**
  * By default query the transfer contract unless given otherwise
  * @param {Array<Uint8Array>} data Data that is sent with the request
@@ -267,6 +272,15 @@ export function request(
  */
 export async function fetchOpenings(pos, node = NODE) {
   return responseBytes(await request(pos, "opening", false, undefined, node));
+}
+
+/**
+ * Fetch the number of notes from the node
+ */
+async function num_notes(node = NODE) {
+  return bytesToBigInt(
+    await responseBytes(await request([], "num_notes", false, undefined, node)),
+  );
 }
 
 /**
@@ -369,4 +383,15 @@ function u32toLE(num) {
   view.setUint32(0, num, true);
 
   return data;
+}
+
+/**
+ * Convert bytes to a big int, assume little endian
+ * @param {Uint8Array} bytes
+ * @returns {BigInt} the big int
+ */
+function bytesToBigInt(bytes) {
+  const view = new DataView(bytes.buffer);
+
+  return view.getBigUint64(0, true);
 }
