@@ -136,7 +136,9 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     // point 1
     if (!currentlastPos) {
       // set the last position to the current position in the network
-      const currentPosition = await num_notes();
+      const currentPosition = await getNetworkNotesCount();
+      // conversion is needed because the number is obtained from the node
+      // which is a 8 bit long integer BigInt
       setLastPos(Number(currentPosition));
 
       return;
@@ -277,8 +279,8 @@ export async function fetchOpenings(pos, node = NODE) {
 /**
  * Fetch the number of notes from the node
  */
-async function num_notes(node = NODE) {
-  return bytesToBigInt(
+async function getNetworkNotesCount(node = NODE) {
+  return bytesToBigIntLE(
     await responseBytes(await request([], "num_notes", false, undefined, node)),
   );
 }
@@ -390,8 +392,6 @@ function u32toLE(num) {
  * @param {Uint8Array} bytes
  * @returns {BigInt} the big int
  */
-function bytesToBigInt(bytes) {
-  const view = new DataView(bytes.buffer);
-
-  return view.getBigUint64(0, true);
+function bytesToBigIntLE(bytes) {
+  return new DataView(bytes.buffer).getBigUint64(0, true);
 }
