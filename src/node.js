@@ -278,12 +278,12 @@ export async function fetchOpenings(pos, node = NODE) {
 
 /**
  * Fetch the number of notes from the node
+ * @param [string] node - Node address
  */
-async function getNetworkNotesCount(node = NODE) {
-  return bytesToBigIntLE(
-    await responseBytes(await request([], "num_notes", false, undefined, node)),
-  );
-}
+const getNetworkNotesCount = (node = NODE) =>
+  request([], "num_notes", false, undefined, node)
+    .then((response) => response.arrayBuffer())
+    .then(getBigUint64LE);
 
 /**
  * Fetch the stake info from the network
