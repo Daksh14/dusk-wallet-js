@@ -135,6 +135,13 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     // skip sync if last position doesn't exist and no block height is provided
     // point 1
     if (!currentlastPos) {
+      // set the last position to the current position in the network
+      const currentPosition = await getNetworkNotesCount();
+      // conversion is needed because the number is obtained from the node
+      // which is a 8 bytes long integer BigInt and we use json for FFI
+      // which doesnt allow u64(s) to be passed, this will change in the future
+      setLastPos(Number(currentPosition));
+
       return;
     } else {
       // point 2 and 3. Sync from cache's last position
@@ -210,6 +217,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
   return correctNotes(wasm);
 }
+
 /**
  * By default query the transfer contract unless given otherwise
  * @param {Array<Uint8Array>} data Data that is sent with the request
@@ -268,6 +276,15 @@ export function request(
 export async function fetchOpenings(pos, node = NODE) {
   return responseBytes(await request(pos, "opening", false, undefined, node));
 }
+
+/**
+ * Fetch the number of notes from the node
+ * @param [string] node - Node address
+ */
+const getNetworkNotesCount = (node = NODE) =>
+  request([], "num_notes", false, undefined, node)
+    .then((response) => response.arrayBuffer())
+    .then((num) => new DataView(num).getBigUint64(0, true));
 
 /**
  * Fetch the stake info from the network
