@@ -138,7 +138,8 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       // set the last position to the current position in the network
       const currentPosition = await getNetworkNotesCount();
       // conversion is needed because the number is obtained from the node
-      // which is a 8 bit long integer BigInt
+      // which is a 8 bytes long integer BigInt and we use json for FFI
+      // which doesnt allow u64(s) to be passed, this will change in the future
       setLastPos(Number(currentPosition));
 
       return;
@@ -283,7 +284,7 @@ export async function fetchOpenings(pos, node = NODE) {
 const getNetworkNotesCount = (node = NODE) =>
   request([], "num_notes", false, undefined, node)
     .then((response) => response.arrayBuffer())
-    .then(getBigUint64LE);
+    .then((num) => new DataView(num).getBigUint64(0, true));
 
 /**
  * Fetch the stake info from the network
@@ -385,13 +386,4 @@ function u32toLE(num) {
   view.setUint32(0, num, true);
 
   return data;
-}
-
-/**
- * Convert bytes to a big int, assume little endian
- * @param {Uint8Array} bytes
- * @returns {BigInt} the big int
- */
-function bytesToBigIntLE(bytes) {
-  return new DataView(bytes.buffer).getBigUint64(0, true);
 }
