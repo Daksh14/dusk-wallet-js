@@ -23,18 +23,84 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
 }
 
 /**
+ * Callback for sync progress
+ *
+ * @callback syncProgress
+ * @param {number} current - current estimated processed block height
+ * @param {number} final - final global network block height to sync to
+ */
+
+/**
  * Check if a note is ownewd by any of the view keys
  * for given seed.
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
  * @param {Uint8Array} leaves - leafs we get from the node
- * @returns {object} - object.last_pos, object.owned_notes
+ * @param {syncProgress} onblock - callback for progress report
+ * @param {number} networkLastPos - last pos of the network
+ * @param {number} networkBlockHeight - latest block height of the network
+ * @returns {Promise<object>} - noteData
  */
-export function getOwnedNotes(wasm, seed, leaves) {
-  const args = new Uint8Array(seed.length + leaves.length);
-  args.set(seed);
-  args.set(leaves, seed.length);
-  return call_raw(wasm, args, "check_note_ownership").then(parseEncodedJSON);
+export async function getOwnedNotes(
+  wasm,
+  seed,
+  leaves,
+  onblock,
+  networkLastPos,
+  networkBlockHeight,
+) {
+  let noteData = {
+    notes: [],
+    blockHeights: [],
+    pks: [],
+    nullifiers: [],
+    lastPos: 0,
+  };
+  const bytesPerFunction = 632 * 10;
+  const total = leaves.length / bytesPerFunction;
+
+  // reuse seed buffer for each chunk
+  const seedBytes = new Uint8Array(seed.length);
+  seedBytes.set(seed);
+
+  for (let i = 0; i < total; i++) {
+    const slice = leaves.slice(
+      i * bytesPerFunction,
+      (i + 1) * bytesPerFunction,
+    );
+
+    const args = new Uint8Array(seedBytes.length + slice.length);
+    args.set(seedBytes);
+    args.set(slice, seedBytes.length);
+
+    const owned = await call_raw(wasm, args, "check_note_ownership").then(
+      parseEncodedJSON,
+    );
+
+    owned.notes.forEach((v) => noteData.notes.push(v));
+    // We use number here because currently wallet-core doesn't know
+    // how to parse json with bigInt since there's no specification for BigInt
+    //
+    // FIXME: We should use bigInt
+    //
+    // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
+    owned.block_heights
+      .split(",")
+      .map(Number)
+      .forEach((v) => noteData.blockHeights.push(v));
+
+    owned.public_spend_keys.forEach((v) => noteData.pks.push(v));
+    owned.nullifiers.forEach((v) => noteData.nullifiers.push(v));
+
+    noteData.lastPos = owned.last_pos;
+
+    const currentBlockHeight =
+      (noteData.lastPos / networkLastPos) * networkBlockHeight;
+
+    onblock(currentBlockHeight, networkBlockHeight);
+  }
+
+  return noteData;
 }
 
 /**
@@ -54,7 +120,7 @@ export function unspentSpentNotes(
   nullifiersOfNote,
   blockHeights,
   existingNullifiers,
-  psks
+  psks,
 ) {
   const args = {
     notes: notes,

@@ -99,6 +99,10 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     return;
   }
 
+  if (typeof options.onblock !== "function") {
+    options.onblock = () => {};
+  }
+
   // our last height where we start fetching from
   // We need to set this number for performance reasons,
   // every invidudal mnemonic walconst has its own last height where it
@@ -106,6 +110,11 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   let position = getNextPos();
   // the points are from the github issue https://github.com/dusk-network/dusk-wallet-js/issues/93#issuecomment-2107632916
   const currentlastPos = lastPosExists();
+  // conversion is needed because the count is obtained from the http node
+  // which returns a 8 bytes long integer BigInt and we use json for FFI
+  // which doesnt allow u64(s) to be passed, this will change in the future
+  const networkLastPos = Number(await getNetworkNotesCount());
+  const networkBlockHeight = await getNetworkBlockHeight();
 
   if (typeof from === "number") {
     if (from <= 0) {
@@ -137,10 +146,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     if (!currentlastPos) {
       // set the last position to the current position in the network
       const currentPosition = await getNetworkNotesCount();
-      // conversion is needed because the number is obtained from the node
-      // which is a 8 bytes long integer BigInt and we use json for FFI
-      // which doesnt allow u64(s) to be passed, this will change in the future
-      setLastPos(Number(currentPosition));
+      setLastPos(networkLastPos);
 
       return;
     } else {
@@ -170,20 +176,18 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     }
   }
 
-  const owned = await abortable(signal).then(() =>
-    getOwnedNotes(wasm, seed, buffer),
+  const { nullifiers, notes, blockHeights, pks, lastPos } = await abortable(
+    signal,
+  ).then(() =>
+    getOwnedNotes(
+      wasm,
+      seed,
+      buffer,
+      options.onblock,
+      networkLastPos,
+      networkBlockHeight,
+    ),
   );
-  const notes = owned.notes;
-  const nullifiers = owned.nullifiers;
-  const psks = owned.public_spend_keys;
-  // We use number here because currently wallet-core doesn't know
-  // how to parse json with bigInt since there's no specification for BigInt
-  //
-  // FIXME: We should use bigInt
-  //
-  // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
-  const blockHeights = owned.block_heights.split(",").map(Number);
-  const lastPos = owned.last_pos;
 
   const nullifiersSerialized = await abortable(signal).then(() =>
     getNullifiersRkyvSerialized(wasm, nullifiers),
@@ -204,7 +208,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       nullifiers,
       blockHeights,
       existingNullifiersBytes,
-      psks,
+      pks,
     ),
   );
 
