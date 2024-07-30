@@ -355,3 +355,22 @@ Deno.test({
     assert(blockHeight > 10);
   },
 });
+
+Deno.test({
+  name: "syncprogress test",
+  async fn() {
+    await wallet.reset();
+
+    const networkBlockHeight = await Wallet.networkBlockHeight;
+
+    let syncOptions = {
+      from: 0,
+      onblock: (current, final) => {
+        assertEquals(final, networkBlockHeight);
+        assertEquals(typeof current, "number");
+      },
+    };
+
+    await wallet.sync(syncOptions);
+  },
+});

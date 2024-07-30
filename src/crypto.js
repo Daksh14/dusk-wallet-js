@@ -23,11 +23,10 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
 }
 
 /**
- * Callback for sync progress
+ * Callback type for getOwnedNotes function progress
  *
  * @callback syncProgress
- * @param {number} current - current estimated processed block height
- * @param {number} final - final global network block height to sync to
+ * @param {number} current - last note position synced
  */
 
 /**
@@ -36,19 +35,10 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
  * @param {Uint8Array} leaves - leafs we get from the node
- * @param {syncProgress} onblock - callback for progress report
- * @param {number} networkLastPos - last pos of the network
- * @param {number} networkBlockHeight - latest block height of the network
+ * @param {syncProgress} onprogress - callback for progress report
  * @returns {Promise<object>} - noteData
  */
-export async function getOwnedNotes(
-  wasm,
-  seed,
-  leaves,
-  onblock,
-  networkLastPos,
-  networkBlockHeight,
-) {
+export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
   let noteData = {
     notes: [],
     blockHeights: [],
@@ -56,7 +46,8 @@ export async function getOwnedNotes(
     nullifiers: [],
     lastPos: 0,
   };
-  const bytesPerFunction = 632 * 10;
+
+  const bytesPerFunction = 632 * 100;
   const total = leaves.length / bytesPerFunction;
 
   // reuse seed buffer for each chunk
@@ -94,10 +85,7 @@ export async function getOwnedNotes(
 
     noteData.lastPos = owned.last_pos;
 
-    const currentBlockHeight =
-      (noteData.lastPos / networkLastPos) * networkBlockHeight;
-
-    onblock(currentBlockHeight, networkBlockHeight);
+    onprogress(noteData.lastPos);
   }
 
   return noteData;

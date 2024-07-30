@@ -69,10 +69,18 @@ class SyncError extends Error {
 }
 
 /**
+ * Callback for sync progress
+ *
+ * @callback syncProgress
+ * @param {number} current - last note position synced
+ */
+
+/**
  * Options for the sync function
  * @typedef {Object} SyncOptions
  * @property {AbortSignal} signal The signal to abort the sync
  * @property {number} from The block height to start syncing from
+ * @property {onblock} from The block height to start syncing from
  */
 
 /**
@@ -90,7 +98,7 @@ class SyncError extends Error {
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, options = {}, node = NODE) {
-  const { signal, from } = options;
+  let { signal, from, onblock } = options;
 
   // if the signal is already aborted, we reject the promise before doing
   //  anything
@@ -99,8 +107,8 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     return;
   }
 
-  if (typeof options.onblock !== "function") {
-    options.onblock = () => {};
+  if (typeof onblock !== "function") {
+    onblock = () => {};
   }
 
   // our last height where we start fetching from
@@ -128,10 +136,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     } else {
       // point 7
       if (!currentlastPos) {
-        const blockHeight = Math.max(
-          0,
-          Math.min(from, await getNetworkBlockHeight()),
-        );
+        const blockHeight = Math.max(0, Math.min(from, networkBlockHeight));
 
         position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
       } else {
@@ -145,7 +150,6 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     // point 1
     if (!currentlastPos) {
       // set the last position to the current position in the network
-      const currentPosition = await getNetworkNotesCount();
       setLastPos(networkLastPos);
 
       return;
@@ -176,18 +180,17 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     }
   }
 
+  // setup progress callback for the sync
+  const onprogress = (currentPos) => {
+    const currentEstimatedBlockHeight =
+      (currentPos / networkLastPos) * networkBlockHeight;
+
+    onblock(currentEstimatedBlockHeight, networkBlockHeight);
+  };
+
   const { nullifiers, notes, blockHeights, pks, lastPos } = await abortable(
     signal,
-  ).then(() =>
-    getOwnedNotes(
-      wasm,
-      seed,
-      buffer,
-      options.onblock,
-      networkLastPos,
-      networkBlockHeight,
-    ),
-  );
+  ).then(() => getOwnedNotes(wasm, seed, buffer, onprogress));
 
   const nullifiersSerialized = await abortable(signal).then(() =>
     getNullifiersRkyvSerialized(wasm, nullifiers),
@@ -368,12 +371,12 @@ export async function blockHeightToLastPos(
     break;
   }
 
-  const { last_pos } = await getOwnedNotes(wasm, seed, firstNote);
+  const { lastPos } = await getOwnedNotes(wasm, seed, firstNote, () => {});
 
-  if (last_pos) {
+  if (lastPos) {
     // Decrement last pos by one to be safe, its okay to fetch an extra position for
     // correctness reasons
-    return last_pos - 1;
+    return lastPos - 1;
   }
 
   return 0;
