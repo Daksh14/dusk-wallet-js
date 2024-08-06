@@ -38,7 +38,7 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
  * @param {Uint8Array} leaves - leafs we get from the node
- * @param {syncProgress} onprogress - callback for progress report
+ * @param {syncProgress} [onprogress] - callback for progress report
  * @returns {Promise<object>} - noteData
  */
 export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
