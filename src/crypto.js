@@ -6,6 +6,9 @@
 
 import { call, call_raw } from "./wasm.js";
 import { parseEncodedJSON } from "./encoding.js";
+
+const chunkSize = 632 * 100;
+
 /**
  * Get nullifiers for the notes
  * @param {WebAssembly.Exports} wasm
@@ -16,7 +19,7 @@ import { parseEncodedJSON } from "./encoding.js";
 export function getNullifiers(wasm, [...seed], [...notes]) {
   const json = {
     seed,
-    notes,
+    notes
   };
 
   return call(wasm, json, "nullifiers");
@@ -39,25 +42,29 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
  * @returns {Promise<object>} - noteData
  */
 export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
-  let noteData = {
+  const totalBytes = leaves.length;
+  const noteData = {
     notes: [],
     blockHeights: [],
     pks: [],
     nullifiers: [],
-    lastPos: 0,
+    lastPos: 0
   };
-
-  const bytesPerFunction = 632 * 100;
-  const total = leaves.length / bytesPerFunction;
+  const bytesPerFunction = onprogress
+    ? Math.min(leaves.length, chunkSize)
+    : totalBytes;
+  const total = totalBytes / bytesPerFunction;
 
   // reuse seed buffer for each chunk
   const seedBytes = new Uint8Array(seed.length);
   seedBytes.set(seed);
 
+  let bytesProcessed = 0;
+
   for (let i = 0; i < total; i++) {
     const slice = leaves.slice(
       i * bytesPerFunction,
-      (i + 1) * bytesPerFunction,
+      (i + 1) * bytesPerFunction
     );
 
     const args = new Uint8Array(seedBytes.length + slice.length);
@@ -65,10 +72,10 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     args.set(slice, seedBytes.length);
 
     const owned = await call_raw(wasm, args, "check_note_ownership").then(
-      parseEncodedJSON,
+      parseEncodedJSON
     );
 
-    owned.notes.forEach((v) => noteData.notes.push(v));
+    owned.notes.forEach(v => noteData.notes.push(v));
     // We use number here because currently wallet-core doesn't know
     // how to parse json with bigInt since there's no specification for BigInt
     //
@@ -78,14 +85,17 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     owned.block_heights
       .split(",")
       .map(Number)
-      .forEach((v) => noteData.blockHeights.push(v));
+      .forEach(v => noteData.blockHeights.push(v));
 
-    owned.public_spend_keys.forEach((v) => noteData.pks.push(v));
-    owned.nullifiers.forEach((v) => noteData.nullifiers.push(v));
+    owned.public_spend_keys.forEach(v => noteData.pks.push(v));
+    owned.nullifiers.forEach(v => noteData.nullifiers.push(v));
 
     noteData.lastPos = owned.last_pos;
 
-    onprogress(noteData.lastPos);
+    if (typeof onprogress === "function") {
+      bytesProcessed = Math.min(bytesProcessed + chunkSize, totalBytes);
+      onprogress(bytesProcessed / totalBytes);
+    }
   }
 
   return noteData;
@@ -108,14 +118,14 @@ export function unspentSpentNotes(
   nullifiersOfNote,
   blockHeights,
   existingNullifiers,
-  psks,
+  psks
 ) {
   const args = {
     notes: notes,
     nullifiers_of_notes: nullifiersOfNote,
     block_heights: blockHeights,
     existing_nullifiers: Array.from(existingNullifiers),
-    psks: psks,
+    psks: psks
   };
   return call(wasm, args, "unspent_spent_notes").then(parseEncodedJSON);
 }
@@ -128,7 +138,7 @@ export function unspentSpentNotes(
  */
 export async function duskToLux(wasm, dusk) {
   const args = {
-    dusk: dusk,
+    dusk: dusk
   };
 
   return parseEncodedJSON(await call(wasm, args, "dusk_to_lux")).lux;
@@ -142,7 +152,7 @@ export async function duskToLux(wasm, dusk) {
  */
 export async function luxToDusk(wasm, lux) {
   const args = {
-    lux: lux,
+    lux: lux
   };
 
   return parseEncodedJSON(await call(wasm, args, "lux_to_dusk")).dusk;

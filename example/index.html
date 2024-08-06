@@ -59,11 +59,12 @@
                 const network = await Wallet.networkBlockHeight;
                 console.log(network);
 
-                let syncOptions = {
+                let sync = await wallet.sync({
                     from: 0,
-                };
-
-                let sync = await wallet.sync(syncOptions);
+                    onblock: (current, final) => {
+                        console.log("b", current, final);
+                    },
+                });
 
                 var endTime = performance.now();
 
