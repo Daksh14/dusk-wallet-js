@@ -62,7 +62,7 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
   let bytesProcessed = 0;
 
   for (let i = 0; i < total; i++) {
-    const slice = leaves.slice(
+    const slice = leaves.subarray(
       i * bytesPerFunction,
       (i + 1) * bytesPerFunction
     );
