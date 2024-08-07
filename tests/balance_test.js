@@ -426,12 +426,12 @@ Deno.test({
   async fn() {
     await wallet.reset();
 
-    const fetch = globalThis.fetch;
+    const oldFetch = globalThis.fetch;
 
     globalThis.fetch = async function(url, options) {
       if (
-        url.href ===
-        "http://127.0.0.1:8080/1/0100000000000000000000000000000000000000000000000000000000000000"
+        url.pathname ===
+        "/1/0100000000000000000000000000000000000000000000000000000000000000"
       ) {
         return new Response(toStream(await Deno.open("notes.rkyv")));
       } else {
@@ -453,6 +453,6 @@ Deno.test({
     assertEquals(i, 10);
 
     // reset fetch impl
-    globalThis.fetch = fetch;
+    globalThis.fetch = oldFetch;
   }
 });
