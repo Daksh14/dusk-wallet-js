@@ -435,7 +435,7 @@ Deno.test({
       ) {
         return new Response(toStream(await Deno.open("notes.rkyv")));
       } else {
-        return fetch(url, options);
+        return oldFetch(url, options);
       }
     };
 
