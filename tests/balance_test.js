@@ -426,9 +426,9 @@ Deno.test({
   async fn() {
     await wallet.reset();
 
-    const fetch = window.fetch;
+    const fetch = globalThis.fetch;
 
-    window.fetch = async function(url, options) {
+    globalThis.fetch = async function(url, options) {
       if (
         url.href ===
         "http://127.0.0.1:8080/1/0100000000000000000000000000000000000000000000000000000000000000"
@@ -453,6 +453,6 @@ Deno.test({
     assertEquals(i, 10);
 
     // reset fetch impl
-    window.fetch = fetch;
+    globalThis.fetch = fetch;
   }
 });
