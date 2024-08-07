@@ -61,8 +61,8 @@
 
                 let sync = await wallet.sync({
                     from: 0,
-                    onblock: (current, final) => {
-                        console.log("b", current, final);
+                    onblock(current, final) {
+                        console.log(`Processing ${current} / ${final}`);
                     },
                 });
 

@@ -7,13 +7,75 @@
 import { Wallet, Gas } from "../dist/wallet.js"; // url_test.ts
 import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
 
+import { readableStreamFromReader as toStream } from "https://deno.land/std@0.136.0/streams/conversion.ts";
+
 const PRECISION_DIGITS = 4;
 
 const DEFAULT_SEED = [
-  153, 16, 102, 99, 133, 196, 55, 237, 42, 2, 163, 116, 233, 89, 10, 115, 19,
-  81, 140, 31, 38, 81, 10, 46, 118, 112, 151, 244, 145, 90, 145, 168, 214, 242,
-  68, 123, 116, 76, 223, 56, 200, 60, 188, 217, 34, 113, 55, 172, 27, 255, 184,
-  55, 143, 233, 109, 20, 137, 34, 20, 196, 252, 117, 221, 221,
+  153,
+  16,
+  102,
+  99,
+  133,
+  196,
+  55,
+  237,
+  42,
+  2,
+  163,
+  116,
+  233,
+  89,
+  10,
+  115,
+  19,
+  81,
+  140,
+  31,
+  38,
+  81,
+  10,
+  46,
+  118,
+  112,
+  151,
+  244,
+  145,
+  90,
+  145,
+  168,
+  214,
+  242,
+  68,
+  123,
+  116,
+  76,
+  223,
+  56,
+  200,
+  60,
+  188,
+  217,
+  34,
+  113,
+  55,
+  172,
+  27,
+  255,
+  184,
+  55,
+  143,
+  233,
+  109,
+  20,
+  137,
+  34,
+  20,
+  196,
+  252,
+  117,
+  221,
+  221
 ];
 
 const wallet = new Wallet(DEFAULT_SEED);
@@ -35,7 +97,7 @@ Deno.test({
     await wallet
       .sync(controller)
       .then(() => (synced = true))
-      .catch((e) => {
+      .catch(e => {
         if (e instanceof DOMException && e.name === "AbortError") {
           synced = false;
         } else {
@@ -44,7 +106,7 @@ Deno.test({
       });
 
     assertEquals(synced, false);
-  },
+  }
 });
 
 // if balance works with the default node address 0 has 1 million dusk staked
@@ -58,7 +120,7 @@ Deno.test({
   },
   // Those are needed due to `fake-indexedDb` implementation
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 // if we are able to fetch psks
@@ -66,7 +128,7 @@ Deno.test({
   name: "25 psks",
   fn() {
     assertEquals(psks.length, 3);
-  },
+  }
 });
 
 Deno.test({
@@ -77,7 +139,7 @@ Deno.test({
   },
   // Those are needed due to `fake-indexedDb` implementation
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -94,7 +156,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -104,7 +166,7 @@ Deno.test({
     await wallet.stake(psks[1], 2000);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -116,7 +178,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -134,7 +196,7 @@ Deno.test({
     assertEquals(info.has_key, true);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -143,7 +205,7 @@ Deno.test({
     await wallet.unstake(psks[1]);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -155,7 +217,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -165,7 +227,7 @@ Deno.test({
     await wallet.stake(psks[1], 2000);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -178,7 +240,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -187,7 +249,7 @@ Deno.test({
     await wallet.withdrawReward(psks[0]);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -202,7 +264,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 let block_height_tx_start = 0;
@@ -225,7 +287,7 @@ Deno.test({
       assertEquals(parseFloat(history[1].amount, 10), history[1].amount);
       assertEquals(
         parseInt(history[1].block_height, 10),
-        history[1].block_height,
+        history[1].block_height
       );
       assertEquals(history[1].direction, "Out");
       assertEquals(parseFloat(history[1].fee, 10), history[1].fee);
@@ -234,7 +296,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -249,7 +311,7 @@ Deno.test({
     assert(!exists);
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 const transactions = {};
@@ -275,13 +337,13 @@ Deno.test({
       for (const tx of history) {
         transactions[tx.id] = {
           amount: tx.amount,
-          block_height: tx.block_height,
+          block_height: tx.block_height
         };
       }
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -292,7 +354,7 @@ Deno.test({
     const block_height = Object.values(transactions)[2].block_height;
 
     let syncOptions = {
-      from: block_height,
+      from: block_height
     };
 
     await wallet.sync(syncOptions).then(async () => {
@@ -303,7 +365,7 @@ Deno.test({
     });
   },
   sanitizeResources: false,
-  sanitizeOps: false,
+  sanitizeOps: false
 });
 
 Deno.test({
@@ -332,7 +394,7 @@ Deno.test({
 
     assertEquals(gas.price, 1);
     assertEquals(gas.limit, 2_900_000_000);
-  },
+  }
 });
 
 Deno.test({
@@ -343,7 +405,7 @@ Deno.test({
 
     assertEquals(gas.price, 3);
     assertEquals(gas.limit, 1_230_000_000);
-  },
+  }
 });
 
 Deno.test({
@@ -353,7 +415,7 @@ Deno.test({
 
     assert(!isNaN(blockHeight));
     assert(blockHeight > 10);
-  },
+  }
 });
 
 Deno.test({
@@ -363,14 +425,23 @@ Deno.test({
 
     const networkBlockHeight = await Wallet.networkBlockHeight;
 
-    let syncOptions = {
+    // const fetch = window.fetch;
+
+    // window.fetch = async function(url, options) {
+    //   return new Response(toStream(await Deno.open("notes.rkyv")));
+    // };
+
+    let i = 0;
+    const syncOptions = {
       from: 0,
-      onblock: (current, final) => {
+      onblock(current, final) {
+        i++;
         assertEquals(final, networkBlockHeight);
         assertEquals(typeof current, "number");
-      },
+      }
     };
 
     await wallet.sync(syncOptions);
-  },
+    assertEquals(i, 1);
+  }
 });

@@ -7,7 +7,7 @@
 import { call, call_raw } from "./wasm.js";
 import { parseEncodedJSON } from "./encoding.js";
 
-const chunkSize = 632 * 100;
+const CHUNK_SIZE = 632 * 100;
 
 /**
  * Get nullifiers for the notes
@@ -51,7 +51,7 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     lastPos: 0
   };
   const bytesPerFunction = onprogress
-    ? Math.min(leaves.length, chunkSize)
+    ? Math.min(totalBytes, CHUNK_SIZE)
     : totalBytes;
   const total = totalBytes / bytesPerFunction;
 
@@ -70,6 +70,12 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     const args = new Uint8Array(seedBytes.length + slice.length);
     args.set(seedBytes);
     args.set(slice, seedBytes.length);
+
+    // inform progress before actually processing
+    if (typeof onprogress === "function") {
+      bytesProcessed = Math.min(bytesProcessed + CHUNK_SIZE, totalBytes);
+      onprogress(bytesProcessed / totalBytes);
+    }
 
     const owned = await call_raw(wasm, args, "check_note_ownership").then(
       parseEncodedJSON
@@ -91,11 +97,6 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     owned.nullifiers.forEach(v => noteData.nullifiers.push(v));
 
     noteData.lastPos = owned.last_pos;
-
-    if (typeof onprogress === "function") {
-      bytesProcessed = Math.min(bytesProcessed + chunkSize, totalBytes);
-      onprogress(bytesProcessed / totalBytes);
-    }
   }
 
   return noteData;
