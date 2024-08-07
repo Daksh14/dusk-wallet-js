@@ -408,10 +408,13 @@ Deno.test({
   }
 });
 
+let networkBlockHeight = 0;
+
 Deno.test({
   name: "check latest network block height",
   async fn() {
     const blockHeight = await Wallet.networkBlockHeight;
+    networkBlockHeight = blockHeight;
 
     assert(!isNaN(blockHeight));
     assert(blockHeight > 10);
@@ -423,13 +426,18 @@ Deno.test({
   async fn() {
     await wallet.reset();
 
-    const networkBlockHeight = await Wallet.networkBlockHeight;
+    const fetch = window.fetch;
 
-    // const fetch = window.fetch;
-
-    // window.fetch = async function(url, options) {
-    //   return new Response(toStream(await Deno.open("notes.rkyv")));
-    // };
+    window.fetch = async function(url, options) {
+      if (
+        url.href ===
+        "http://127.0.0.1:8080/1/0100000000000000000000000000000000000000000000000000000000000000"
+      ) {
+        return new Response(toStream(await Deno.open("notes.rkyv")));
+      } else {
+        return fetch(url, options);
+      }
+    };
 
     let i = 0;
     const syncOptions = {
@@ -442,6 +450,9 @@ Deno.test({
     };
 
     await wallet.sync(syncOptions);
-    assertEquals(i, 1);
+    assertEquals(i, 10);
+
+    // reset fetch impl
+    window.fetch = fetch;
   }
 });

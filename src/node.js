@@ -167,15 +167,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
-  let buffer = [];
-
-  for await (const chunk of resp.body) {
-    const len = chunk.length;
-
-    for (let i = 0; i < len; i++) {
-      buffer.push(chunk[i]);
-    }
-  }
+  const buffer = new Uint8Array(await resp.arrayBuffer());
 
   let onprogress;
   if (typeof onblock === "function") {
@@ -272,7 +264,6 @@ export function request(
   }
 
   const url = new URL(path.join(targetType, target), node);
-
   return fetch(url, {
     method: "POST",
     headers,
