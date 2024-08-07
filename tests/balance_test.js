@@ -362,6 +362,8 @@ Deno.test({
       assertEquals(history[0].block_height, block_height);
       assertEquals(history[1].amount.toFixed(PRECISION_DIGITS), "-3000.0003");
       assertEquals(history[2].amount.toFixed(PRECISION_DIGITS), "-5000.0003");
+
+      await wallet.reset();
     });
   },
   sanitizeResources: false,
@@ -424,8 +426,6 @@ Deno.test({
 Deno.test({
   name: "syncprogress test",
   async fn() {
-    await wallet.reset();
-
     const oldFetch = globalThis.fetch;
 
     globalThis.fetch = async function(url, options) {
