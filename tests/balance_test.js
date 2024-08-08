@@ -364,7 +364,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "syncprogress test",
+  name: "syncprogress more than chunkSize notes test",
   async fn() {
     const oldFetch = globalThis.fetch;
 
@@ -373,7 +373,7 @@ Deno.test({
         url.pathname ===
         "/1/0100000000000000000000000000000000000000000000000000000000000000"
       ) {
-        return new Response(toStream(await Deno.open("notes.rkyv")));
+        return new Response(toStream(await Deno.open("tests/notes.rkyv")));
       } else {
         return oldFetch(url, options);
       }
@@ -391,6 +391,44 @@ Deno.test({
 
     await wallet.sync(syncOptions);
     assertEquals(i, 10);
+
+    // reset fetch impl
+    globalThis.fetch = oldFetch;
+    await wallet.reset();
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "syncprogress less than chunkSize notes test",
+  async fn() {
+    const oldFetch = globalThis.fetch;
+
+    globalThis.fetch = async function (url, options) {
+      if (
+        url.pathname ===
+        "/1/0100000000000000000000000000000000000000000000000000000000000000"
+      ) {
+        return new Response(toStream(await Deno.open("tests/notes_100.rkyv")));
+      } else {
+        return oldFetch(url, options);
+      }
+    };
+
+    let i = 0;
+    const syncOptions = {
+      from: 0,
+      onblock(current, final) {
+        i++;
+        assertEquals(final, networkBlockHeight);
+        assertEquals(typeof current, "number");
+      },
+    };
+
+    await wallet.sync(syncOptions);
+    // check if only one iteration
+    assertEquals(i, 1);
 
     // reset fetch impl
     globalThis.fetch = oldFetch;

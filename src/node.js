@@ -368,7 +368,7 @@ export async function blockHeightToLastPos(
     break;
   }
 
-  const { lastPos } = await getOwnedNotes(wasm, seed, firstNote, () => {});
+  const { lastPos } = await getOwnedNotes(wasm, seed, firstNote);
 
   if (lastPos) {
     // Decrement last pos by one to be safe, its okay to fetch an extra position for

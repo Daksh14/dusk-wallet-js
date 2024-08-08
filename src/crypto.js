@@ -92,7 +92,7 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
       owned.block_heights.split(",").map(Number),
     );
 
-    noteData.pks = noteData.pks.concat(owned.public_spend_key);
+    noteData.pks = noteData.pks.concat(owned.public_spend_keys);
     noteData.nullifiers = noteData.nullifiers.concat(owned.nullifiers);
 
     noteData.lastPos = owned.last_pos;
