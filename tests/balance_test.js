@@ -6,8 +6,7 @@
 
 import { Wallet, Gas } from "../dist/wallet.js"; // url_test.ts
 import { assert, assertEquals, Dexie, indexedDB } from "../deps.js";
-
-import { readableStreamFromReader as toStream } from "https://deno.land/std@0.136.0/streams/conversion.ts";
+import { withMockedFetch } from "./mock.js";
 
 const PRECISION_DIGITS = 4;
 
@@ -259,28 +258,27 @@ const transactions = {};
 Deno.test({
   name: "create dummy transactions",
   async fn() {
-    await wallet.sync({ from: 0 }).then(async () => {
-      await wallet.transfer(psks[0], psks[1], 2000).then(async () => {
-        await wallet.sync().then(async () => {
-          await wallet.transfer(psks[0], psks[1], 3000).then(async () => {
-            await wallet.sync().then(async () => {
-              await wallet.transfer(psks[0], psks[1], 5000);
-            });
-          });
-        });
-      });
-    });
+    await wallet.sync({ from: 0 });
 
-    await wallet.sync().then(async () => {
-      const history = await wallet.history(psks[0]);
+    await wallet.transfer(psks[0], psks[1], 2000);
 
-      for (const tx of history) {
-        transactions[tx.id] = {
-          amount: tx.amount,
-          block_height: tx.block_height,
-        };
-      }
-    });
+    await wallet.sync();
+
+    await wallet.transfer(psks[0], psks[1], 3000);
+
+    await wallet.sync();
+
+    await wallet.transfer(psks[0], psks[1], 5000);
+
+    await wallet.sync();
+    const history = await wallet.history(psks[0]);
+
+    for (const tx of history) {
+      transactions[tx.id] = {
+        amount: tx.amount,
+        block_height: tx.block_height,
+      };
+    }
   },
   sanitizeResources: false,
   sanitizeOps: false,
@@ -350,34 +348,20 @@ Deno.test({
   },
 });
 
-let networkBlockHeight = 0;
-
 Deno.test({
   name: "check latest network block height",
   async fn() {
-    const blockHeight = await Wallet.networkBlockHeight;
-    networkBlockHeight = blockHeight;
+    const networkBlockHeight = await Wallet.networkBlockHeight;
 
-    assert(!isNaN(blockHeight));
-    assert(blockHeight > 10);
+    assert(!isNaN(networkBlockHeight));
+    assert(networkBlockHeight > 10);
   },
 });
 
 Deno.test({
   name: "syncprogress more than chunkSize notes test",
-  async fn() {
-    const oldFetch = globalThis.fetch;
-
-    globalThis.fetch = async function (url, options) {
-      if (
-        url.pathname ===
-        "/1/0100000000000000000000000000000000000000000000000000000000000000"
-      ) {
-        return new Response(toStream(await Deno.open("tests/notes.rkyv")));
-      } else {
-        return oldFetch(url, options);
-      }
-    };
+  fn: withMockedFetch(async () => {
+    const networkBlockHeight = await Wallet.networkBlockHeight;
 
     let i = 0;
     const syncOptions = {
@@ -392,48 +376,35 @@ Deno.test({
     await wallet.sync(syncOptions);
     assertEquals(i, 10);
 
-    // reset fetch impl
-    globalThis.fetch = oldFetch;
     await wallet.reset();
-  },
+  }),
   sanitizeResources: false,
   sanitizeOps: false,
 });
 
 Deno.test({
   name: "syncprogress less than chunkSize notes test",
-  async fn() {
-    const oldFetch = globalThis.fetch;
-    const latestBlockHeight = await Wallet.networkBlockHeight;
+  fn: withMockedFetch(
+    async () => {
+      const networkBlockHeight = await Wallet.networkBlockHeight;
 
-    globalThis.fetch = async function (url, options) {
-      if (
-        url.pathname ===
-        "/1/0100000000000000000000000000000000000000000000000000000000000000"
-      ) {
-        return new Response(toStream(await Deno.open("tests/notes_100.rkyv")));
-      } else {
-        return oldFetch(url, options);
-      }
-    };
+      let i = 0;
+      const syncOptions = {
+        from: 0,
+        onblock(current, final) {
+          i++;
+          assertEquals(final, networkBlockHeight);
+          assertEquals(typeof current, "number");
+        },
+      };
 
-    let i = 0;
-    const syncOptions = {
-      from: 0,
-      onblock(current, final) {
-        i++;
-        assertEquals(final, latestBlockHeight);
-        assertEquals(typeof current, "number");
-      },
-    };
+      await wallet.sync(syncOptions);
 
-    await wallet.sync(syncOptions);
-    // check if only one iteration
-    assertEquals(i, 1);
-
-    // reset fetch impl
-    globalThis.fetch = oldFetch;
-  },
+      // check if only one iteration
+      assertEquals(i, 1);
+    },
+    { maxItems: 33 },
+  ),
   sanitizeResources: false,
   sanitizeOps: false,
 });

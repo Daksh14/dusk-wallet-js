@@ -55,10 +55,6 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     : totalBytes;
   const total = totalBytes / bytesPerFunction;
 
-  // reuse seed buffer for each chunk
-  const seedBytes = new Uint8Array(seed.length);
-  seedBytes.set(seed);
-
   let bytesProcessed = 0;
 
   for (let i = 0; i < total; i++) {
@@ -67,9 +63,9 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
       (i + 1) * bytesPerFunction,
     );
 
-    const args = new Uint8Array(seedBytes.length + slice.length);
-    args.set(seedBytes);
-    args.set(slice, seedBytes.length);
+    const args = new Uint8Array(seed.length + slice.length);
+    args.set(seed);
+    args.set(slice, seed.length);
 
     // inform progress before actually processing
     if (typeof onprogress === "function") {
