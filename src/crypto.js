@@ -88,7 +88,7 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
     // FIXME: We should use bigInt
     //
     // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
-    noteData.blockHeights = blockHeights.concat(
+    noteData.blockHeights = noteData.blockHeights.concat(
       owned.block_heights.split(",").map(Number),
     );
 
