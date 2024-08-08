@@ -81,20 +81,19 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
       parseEncodedJSON,
     );
 
-    owned.notes.forEach((v) => noteData.notes.push(v));
+    noteData.notes = noteData.notes.concat(owned.notes);
     // We use number here because currently wallet-core doesn't know
     // how to parse json with bigInt since there's no specification for BigInt
     //
     // FIXME: We should use bigInt
     //
     // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
-    owned.block_heights
-      .split(",")
-      .map(Number)
-      .forEach((v) => noteData.blockHeights.push(v));
+    noteData.blockHeights = blockHeights.concat(
+      owned.block_heights.split(",").map(Number),
+    );
 
-    owned.public_spend_keys.forEach((v) => noteData.pks.push(v));
-    owned.nullifiers.forEach((v) => noteData.nullifiers.push(v));
+    noteData.pks = noteData.pks.concat(owned.public_spend_key);
+    noteData.nullifiers = noteData.nullifiers.concat(owned.nullifiers);
 
     noteData.lastPos = owned.last_pos;
   }
