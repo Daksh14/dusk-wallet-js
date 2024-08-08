@@ -404,6 +404,7 @@ Deno.test({
   name: "syncprogress less than chunkSize notes test",
   async fn() {
     const oldFetch = globalThis.fetch;
+    const latestBlockHeight = await Wallet.networkBlockHeight;
 
     globalThis.fetch = async function (url, options) {
       if (
@@ -421,7 +422,7 @@ Deno.test({
       from: 0,
       onblock(current, final) {
         i++;
-        assertEquals(final, networkBlockHeight);
+        assertEquals(final, latestBlockHeight);
         assertEquals(typeof current, "number");
       },
     };
