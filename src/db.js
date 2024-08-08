@@ -56,7 +56,7 @@ export async function insertSpentUnspentNotes(
   unspentNotes,
   spentNotes,
   pos,
-  blockHeight
+  blockHeight,
 ) {
   try {
     if (localStorage.getItem("lastPos") == null) {
@@ -65,7 +65,7 @@ export async function insertSpentUnspentNotes(
     localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
     localStorage.setItem(
       "blockHeight",
-      Math.max(blockHeight, getLastBlockHeight())
+      Math.max(blockHeight, getLastBlockHeight()),
     );
   } catch (e) {
     console.warn("Cannot set pos in local storage, the wallet will be slow");
@@ -92,7 +92,7 @@ export async function getUnspentNotes(psk) {
   const myTable = db.table("unspentNotes");
 
   if (myTable) {
-    const notes = myTable.filter(note => note.psk == psk);
+    const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
 
     return result;
@@ -112,7 +112,7 @@ export async function getSpentNotes(psk) {
   const myTable = db.table("spentNotes");
 
   if (myTable) {
-    const notes = myTable.filter(note => note.psk == psk);
+    const notes = myTable.filter((note) => note.psk == psk);
     const result = await notes.toArray();
 
     return result;
@@ -170,11 +170,11 @@ export async function getAllNotes(psk) {
 
   const unspentNotesTable = db
     .table("unspentNotes")
-    .filter(note => note.psk == psk);
+    .filter((note) => note.psk == psk);
 
   const spentNotesTable = db
     .table("spentNotes")
-    .filter(note => note.psk == psk);
+    .filter((note) => note.psk == psk);
 
   const unspent = await unspentNotesTable.toArray();
   const spent = await spentNotesTable.toArray();
@@ -216,7 +216,7 @@ export async function correctNotes(wasm) {
   // get the nullifiers
   const unspentNotesNullifiersSerialized = await getNullifiersRkyvSerialized(
     wasm,
-    unspentNotesNullifiers
+    unspentNotesNullifiers,
   );
 
   // Fetch existing nullifiers from the node
@@ -224,8 +224,8 @@ export async function correctNotes(wasm) {
     await request(
       unspentNotesNullifiersSerialized,
       "existing_nullifiers",
-      false
-    )
+      false,
+    ),
   );
 
   // calculate the unspent and spent notes
@@ -237,12 +237,12 @@ export async function correctNotes(wasm) {
     unspentNotesNullifiers,
     unspentNotesBlockHeights,
     unspentNotesExistingNullifiersBytes,
-    unspentNotesPsks
+    unspentNotesPsks,
   );
 
   // These are the spent notes which were unspent before
   const correctedSpentNotes = Array.from(correctedNotes.spent_notes);
-  const posToRemove = correctedSpentNotes.map(noteData => noteData.pos);
+  const posToRemove = correctedSpentNotes.map((noteData) => noteData.pos);
 
   return deleteUnspentNotesInsertSpentNotes(posToRemove, correctedSpentNotes);
 }
@@ -260,7 +260,8 @@ export async function insertHistory(historyData) {
   historyData.history = existingHistory.history
     .concat(historyData.history)
     .filter(
-      (v, i, a) => a.findIndex(v2 => v2.block_height === v.block_height) === i
+      (v, i, a) =>
+        a.findIndex((v2) => v2.block_height === v.block_height) === i,
     );
 
   await db.cache.put(historyData);
@@ -338,7 +339,7 @@ function initializeState() {
     // Added a autoincremented id for good practice
     // if we need to index it in future
     unspentNotes: "pos,psk,nullifier",
-    spentNotes: "pos,psk,nullifier"
+    spentNotes: "pos,psk,nullifier",
   });
 
   return db;
@@ -348,7 +349,7 @@ function initializeHistory() {
   const db = new Dexie("history");
 
   db.version(1).stores({
-    cache: "&psk"
+    cache: "&psk",
   });
 
   return db;

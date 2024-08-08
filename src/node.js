@@ -14,7 +14,7 @@ import {
   correctNotes,
   setLastPos,
   lastPosExists,
-  getLastBlockHeight
+  getLastBlockHeight,
 } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
@@ -26,9 +26,9 @@ const NODE = process.env.CURRENT_NODE;
 const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 
 // Return a promised rejected if the signal is aborted, resolved otherwise
-const abortable = signal =>
+const abortable = (signal) =>
   new Promise((resolve, rejected) =>
-    signal?.aborted ? reject(signal.reason) : resolve(signal)
+    signal?.aborted ? reject(signal.reason) : resolve(signal),
   );
 
 /**
@@ -48,7 +48,7 @@ export function StakeInfo(
   amount,
   reward,
   counter,
-  epoch
+  epoch,
 ) {
   this.has_key = has_key;
   this.has_staked = has_staked;
@@ -126,7 +126,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       if (position > 0) {
         // point 6 throw error if position exists and we're trying to sync from 0
         throw new SyncError(
-          `Cannot sync from block height ${from} with an existing cache`
+          `Cannot sync from block height ${from} with an existing cache`,
         );
       }
       // point 4 and 5, sync from getNextPos() if position doesn't exist
@@ -138,7 +138,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
         position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
       } else {
         throw new SyncError(
-          `Cannot sync from block height ${from} with an existing cache`
+          `Cannot sync from block height ${from} with an existing cache`,
         );
       }
     }
@@ -162,7 +162,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     "leaves_from_pos",
     true,
     signal,
-    node
+    node,
   );
 
   // contains the chunks of the response, at the end of each iteration
@@ -174,7 +174,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     const lastBlockHeight = getLastBlockHeight();
     const blocksToSync = networkBlockHeight - lastBlockHeight;
     // setup progress callback for the sync
-    onprogress = progress => {
+    onprogress = (progress) => {
       const current = Math.floor(lastBlockHeight + blocksToSync * progress);
 
       onblock(current, networkBlockHeight);
@@ -182,11 +182,11 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   }
 
   const { nullifiers, notes, blockHeights, pks, lastPos } = await abortable(
-    signal
+    signal,
   ).then(() => getOwnedNotes(wasm, seed, buffer, onprogress));
 
   const nullifiersSerialized = await abortable(signal).then(() =>
-    getNullifiersRkyvSerialized(wasm, nullifiers)
+    getNullifiersRkyvSerialized(wasm, nullifiers),
   );
 
   // Fetch existing nullifiers from the node
@@ -194,7 +194,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     nullifiersSerialized,
     "existing_nullifiers",
     false,
-    signal
+    signal,
   ).then(responseBytes);
 
   const allNotes = await abortable(signal).then(() =>
@@ -204,8 +204,8 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       nullifiers,
       blockHeights,
       existingNullifiersBytes,
-      pks
-    )
+      pks,
+    ),
   );
 
   const unspentNotes = Array.from(allNotes.unspent_notes);
@@ -216,8 +216,8 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       unspentNotes,
       spentNotes,
       lastPos,
-      networkBlockHeight
-    )
+      networkBlockHeight,
+    ),
   );
 
   return correctNotes(wasm);
@@ -242,7 +242,7 @@ export function request(
   signal,
   node = NODE,
   target = TRANSFER_CONTRACT,
-  targetType = "1"
+  targetType = "1",
 ) {
   const request_name_bytes = encode(request_name);
   const number = u32toLE(request_name.length);
@@ -256,7 +256,7 @@ export function request(
   body.set(new Uint8Array(data), number.length + request_name_bytes.length);
   const headers = {
     "Content-Type": "application/octet-stream",
-    "rusk-version": "0.7.0"
+    "rusk-version": "0.7.0",
   };
 
   if (stream) {
@@ -267,7 +267,7 @@ export function request(
   return fetch(url, {
     method: "POST",
     headers,
-    body
+    body,
   });
 }
 
@@ -287,8 +287,8 @@ export async function fetchOpenings(pos, node = NODE) {
  */
 const getNetworkNotesCount = (node = NODE) =>
   request([], "num_notes", false, undefined, node)
-    .then(response => response.arrayBuffer())
-    .then(num => new DataView(num).getBigUint64(0, true));
+    .then((response) => response.arrayBuffer())
+    .then((num) => new DataView(num).getBigUint64(0, true));
 
 /**
  * Fetch the stake info from the network
@@ -308,12 +308,12 @@ export async function stakeInfo(wasm, seed, index) {
       undefined,
       undefined,
       process.env.STAKE_CONTRACT,
-      "1"
-    )
+      "1",
+    ),
   );
 
   const args = {
-    stake_info: Array.from(stakeInfoRequest)
+    stake_info: Array.from(stakeInfoRequest),
   };
 
   const info = await call(wasm, args, "get_stake_info").then(parseEncodedJSON);
@@ -326,7 +326,7 @@ export async function stakeInfo(wasm, seed, index) {
     info.reward,
     info.counter,
     // calculating epoch
-    info.eligiblity / 2160
+    info.eligiblity / 2160,
   );
 }
 
@@ -350,14 +350,14 @@ export async function blockHeightToLastPos(
   wasm,
   seed,
   blockHeight,
-  node = NODE
+  node = NODE,
 ) {
   const resp = await request(
     await getU64RkyvSerialized(wasm, blockHeight),
     "leaves_from_height",
     true,
     undefined,
-    node
+    node,
   );
 
   let firstNote = [];
