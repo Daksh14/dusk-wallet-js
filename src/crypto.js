@@ -6,6 +6,9 @@
 
 import { call, call_raw } from "./wasm.js";
 import { parseEncodedJSON } from "./encoding.js";
+
+const CHUNK_SIZE = 632 * 100;
+
 /**
  * Get nullifiers for the notes
  * @param {WebAssembly.Exports} wasm
@@ -23,18 +26,75 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
 }
 
 /**
+ * Callback type for getOwnedNotes function progress
+ *
+ * @callback syncProgress
+ * @param {number} current - last note position synced
+ */
+
+/**
  * Check if a note is ownewd by any of the view keys
  * for given seed.
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
  * @param {Uint8Array} leaves - leafs we get from the node
- * @returns {object} - object.last_pos, object.owned_notes
+ * @param {syncProgress} [onprogress] - callback for progress report
+ * @returns {Promise<object>} - noteData
  */
-export function getOwnedNotes(wasm, seed, leaves) {
-  const args = new Uint8Array(seed.length + leaves.length);
-  args.set(seed);
-  args.set(leaves, seed.length);
-  return call_raw(wasm, args, "check_note_ownership").then(parseEncodedJSON);
+export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
+  const totalBytes = leaves.length;
+  const noteData = {
+    notes: [],
+    blockHeights: [],
+    pks: [],
+    nullifiers: [],
+    lastPos: 0,
+  };
+  const bytesPerFunction = onprogress
+    ? Math.min(totalBytes, CHUNK_SIZE)
+    : totalBytes;
+  const total = totalBytes / bytesPerFunction;
+
+  let bytesProcessed = 0;
+
+  for (let i = 0; i < total; i++) {
+    const slice = leaves.subarray(
+      i * bytesPerFunction,
+      (i + 1) * bytesPerFunction,
+    );
+
+    const args = new Uint8Array(seed.length + slice.length);
+    args.set(seed);
+    args.set(slice, seed.length);
+
+    // inform progress before actually processing
+    if (typeof onprogress === "function") {
+      bytesProcessed = Math.min(bytesProcessed + CHUNK_SIZE, totalBytes);
+      onprogress(bytesProcessed / totalBytes);
+    }
+
+    const owned = await call_raw(wasm, args, "check_note_ownership").then(
+      parseEncodedJSON,
+    );
+
+    noteData.notes = noteData.notes.concat(owned.notes);
+    // We use number here because currently wallet-core doesn't know
+    // how to parse json with bigInt since there's no specification for BigInt
+    //
+    // FIXME: We should use bigInt
+    //
+    // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
+    noteData.blockHeights = noteData.blockHeights.concat(
+      owned.block_heights.split(",").map(Number),
+    );
+
+    noteData.pks = noteData.pks.concat(owned.public_spend_keys);
+    noteData.nullifiers = noteData.nullifiers.concat(owned.nullifiers);
+
+    noteData.lastPos = owned.last_pos;
+  }
+
+  return noteData;
 }
 
 /**
@@ -54,7 +114,7 @@ export function unspentSpentNotes(
   nullifiersOfNote,
   blockHeights,
   existingNullifiers,
-  psks
+  psks,
 ) {
   const args = {
     notes: notes,

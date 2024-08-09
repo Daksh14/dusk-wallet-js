@@ -49,14 +49,24 @@ export function HistoryData(psk, history) {
  * @param {Array<NoteData>} unspent_notes Notes which are not spent
  * @param {Array<NoteData>} spent_notes
  * @param {number} pos The position we are at right now
+ * @param {number} blockHeight The block height we are at right now
  * @ignore Only called by the sync function
  */
-export async function insertSpentUnspentNotes(unspentNotes, spentNotes, pos) {
+export async function insertSpentUnspentNotes(
+  unspentNotes,
+  spentNotes,
+  pos,
+  blockHeight,
+) {
   try {
     if (localStorage.getItem("lastPos") == null) {
     }
 
     localStorage.setItem("lastPos", Math.max(pos, getLastPos()));
+    localStorage.setItem(
+      "blockHeight",
+      Math.max(blockHeight, getLastBlockHeight()),
+    );
   } catch (e) {
     console.warn("Cannot set pos in local storage, the wallet will be slow");
   }
@@ -116,6 +126,14 @@ export async function getSpentNotes(psk) {
  * @ignore Only called by the sync function
  */
 export const getLastPos = () => parseInt(localStorage.getItem("lastPos")) || 0;
+/**
+ * Fetch last blockheight from the localStorage if there is any 0 by default
+ *
+ * @returns {number} blockHeight the last block height
+ * @ignore Only called by the sync function
+ */
+export const getLastBlockHeight = () =>
+  parseInt(localStorage.getItem("blockHeight")) || 0;
 
 /**
  * Increment the lastPos by 1 if non zero

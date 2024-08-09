@@ -60,7 +60,10 @@
                 console.log(network);
 
                 let sync = await wallet.sync({
-                    from: network,
+                    from: 0,
+                    onblock(current, final) {
+                        console.log(`Processing ${current} / ${final}`);
+                    },
                 });
 
                 var endTime = performance.now();

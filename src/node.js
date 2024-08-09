@@ -14,6 +14,7 @@ import {
   correctNotes,
   setLastPos,
   lastPosExists,
+  getLastBlockHeight,
 } from "./db.js";
 import { getOwnedNotes, unspentSpentNotes } from "./crypto.js";
 import { path } from "../deps.js";
@@ -69,10 +70,18 @@ class SyncError extends Error {
 }
 
 /**
+ * Callback for sync progress
+ *
+ * @callback syncProgress
+ * @param {number} current - last note position synced
+ */
+
+/**
  * Options for the sync function
  * @typedef {Object} SyncOptions
  * @property {AbortSignal} signal The signal to abort the sync
  * @property {number} from The block height to start syncing from
+ * @property {onblock} from The block height to start syncing from
  */
 
 /**
@@ -90,7 +99,7 @@ class SyncError extends Error {
  * @returns {Promise} Promise that resolves when the sync is done
  */
 export async function sync(wasm, seed, options = {}, node = NODE) {
-  const { signal, from } = options;
+  let { signal, from, onblock } = options;
 
   // if the signal is already aborted, we reject the promise before doing
   //  anything
@@ -106,6 +115,11 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   let position = getNextPos();
   // the points are from the github issue https://github.com/dusk-network/dusk-wallet-js/issues/93#issuecomment-2107632916
   const currentlastPos = lastPosExists();
+  // conversion is needed because the count is obtained from the http node
+  // which returns a 8 bytes long integer BigInt and we use json for FFI
+  // which doesnt allow u64(s) to be passed, this will change in the future
+  const networkLastPos = Number(await getNetworkNotesCount());
+  const networkBlockHeight = await getNetworkBlockHeight();
 
   if (typeof from === "number") {
     if (from <= 0) {
@@ -119,10 +133,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     } else {
       // point 7
       if (!currentlastPos) {
-        const blockHeight = Math.max(
-          0,
-          Math.min(from, await getNetworkBlockHeight()),
-        );
+        const blockHeight = Math.max(0, Math.min(from, networkBlockHeight));
 
         position = await blockHeightToLastPos(wasm, seed, blockHeight, node);
       } else {
@@ -136,11 +147,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
     // point 1
     if (!currentlastPos) {
       // set the last position to the current position in the network
-      const currentPosition = await getNetworkNotesCount();
-      // conversion is needed because the number is obtained from the node
-      // which is a 8 bytes long integer BigInt and we use json for FFI
-      // which doesnt allow u64(s) to be passed, this will change in the future
-      setLastPos(Number(currentPosition));
+      setLastPos(networkLastPos);
 
       return;
     } else {
@@ -160,30 +167,23 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
   // contains the chunks of the response, at the end of each iteration
   // it conatains the remaining bytes
-  let buffer = [];
+  const buffer = new Uint8Array(await resp.arrayBuffer());
 
-  for await (const chunk of resp.body) {
-    const len = chunk.length;
+  let onprogress;
+  if (typeof onblock === "function") {
+    const lastBlockHeight = getLastBlockHeight();
+    const blocksToSync = networkBlockHeight - lastBlockHeight;
+    // setup progress callback for the sync
+    onprogress = (progress) => {
+      const current = Math.floor(lastBlockHeight + blocksToSync * progress);
 
-    for (let i = 0; i < len; i++) {
-      buffer.push(chunk[i]);
-    }
+      onblock(current, networkBlockHeight);
+    };
   }
 
-  const owned = await abortable(signal).then(() =>
-    getOwnedNotes(wasm, seed, buffer),
-  );
-  const notes = owned.notes;
-  const nullifiers = owned.nullifiers;
-  const psks = owned.public_spend_keys;
-  // We use number here because currently wallet-core doesn't know
-  // how to parse json with bigInt since there's no specification for BigInt
-  //
-  // FIXME: We should use bigInt
-  //
-  // See: <https://github.com/dusk-network/dusk-wallet-js/issues/59>
-  const blockHeights = owned.block_heights.split(",").map(Number);
-  const lastPos = owned.last_pos;
+  const { nullifiers, notes, blockHeights, pks, lastPos } = await abortable(
+    signal,
+  ).then(() => getOwnedNotes(wasm, seed, buffer, onprogress));
 
   const nullifiersSerialized = await abortable(signal).then(() =>
     getNullifiersRkyvSerialized(wasm, nullifiers),
@@ -204,7 +204,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
       nullifiers,
       blockHeights,
       existingNullifiersBytes,
-      psks,
+      pks,
     ),
   );
 
@@ -212,7 +212,12 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
   const spentNotes = Array.from(allNotes.spent_notes);
 
   await abortable(signal).then(() =>
-    insertSpentUnspentNotes(unspentNotes, spentNotes, lastPos),
+    insertSpentUnspentNotes(
+      unspentNotes,
+      spentNotes,
+      lastPos,
+      networkBlockHeight,
+    ),
   );
 
   return correctNotes(wasm);
@@ -259,7 +264,6 @@ export function request(
   }
 
   const url = new URL(path.join(targetType, target), node);
-
   return fetch(url, {
     method: "POST",
     headers,
@@ -364,12 +368,12 @@ export async function blockHeightToLastPos(
     break;
   }
 
-  const { last_pos } = await getOwnedNotes(wasm, seed, firstNote);
+  const { lastPos } = await getOwnedNotes(wasm, seed, firstNote);
 
-  if (last_pos) {
+  if (lastPos) {
     // Decrement last pos by one to be safe, its okay to fetch an extra position for
     // correctness reasons
-    return last_pos - 1;
+    return lastPos - 1;
   }
 
   return 0;
