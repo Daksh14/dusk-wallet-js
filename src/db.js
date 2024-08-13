@@ -286,6 +286,7 @@ export async function getHistory(psk) {
 export async function clearDB() {
   localStorage.removeItem("lastPos");
   localStorage.removeItem("lastPsk");
+  localStorage.removeItem("blockHeight");
 
   await Dexie.delete("history");
 

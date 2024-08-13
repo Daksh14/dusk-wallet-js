@@ -27,7 +27,7 @@ const RKYV_TREE_LEAF_SIZE = process.env.RKYV_TREE_LEAF_SIZE;
 
 // Return a promised rejected if the signal is aborted, resolved otherwise
 const abortable = (signal) =>
-  new Promise((resolve, rejected) =>
+  new Promise((resolve, reject) =>
     signal?.aborted ? reject(signal.reason) : resolve(signal),
   );
 
@@ -183,7 +183,7 @@ export async function sync(wasm, seed, options = {}, node = NODE) {
 
   const { nullifiers, notes, blockHeights, pks, lastPos } = await abortable(
     signal,
-  ).then(() => getOwnedNotes(wasm, seed, buffer, onprogress));
+  ).then(() => getOwnedNotes(wasm, seed, buffer, { onprogress, signal }));
 
   const nullifiersSerialized = await abortable(signal).then(() =>
     getNullifiersRkyvSerialized(wasm, nullifiers),
@@ -268,6 +268,7 @@ export function request(
     method: "POST",
     headers,
     body,
+    signal,
   });
 }
 
