@@ -34,6 +34,7 @@ export const createResponse = async (maxItems) => {
  * @param {Function} fn - The function to wrap with mocked fetch.
  * @param {Object} mockOptions - Options to configure the mock behavior.
  * @param {number} [mockOptions.maxItems] - The maximum number of items for the mocked response.
+ * @param {AbortController} [mockOptions.controller] - Controller to abort the signal before provide the mocked response, if provided.
  * @returns {Function} A function that, when called, executes the wrapped function with mocked fetch.
  */
 export function withMockedFetch(fn, mockOptions = {}) {
@@ -47,6 +48,14 @@ export function withMockedFetch(fn, mockOptions = {}) {
       // since only those requests should be mocked (fetching notes
       // from the rusk node)
       if (options?.headers?.["Rusk-Feeder"] === "1") {
+        if (mockOptions.controller) {
+          mockOptions.controller.abort();
+        }
+
+        if (options.signal?.aborted) {
+          return Promise.reject(options.signal.reason);
+        }
+
         // Return a custom response created with the specified maxItems
         return createResponse(mockOptions.maxItems);
       } else {
