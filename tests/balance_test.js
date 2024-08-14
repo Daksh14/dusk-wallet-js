@@ -44,7 +44,7 @@ Deno.test({
         }
       });
 
-    assertEquals(synced, false);
+    assert(!synced, "Should not have synced");
   },
 });
 
@@ -359,24 +359,106 @@ Deno.test({
 });
 
 Deno.test({
-  name: "syncprogress more than chunkSize notes test",
+  name: "test abort during syncprogress",
   fn: withMockedFetch(async () => {
-    const networkBlockHeight = await Wallet.networkBlockHeight;
+    // Clear the wallet before calling sync
+    await wallet.reset();
 
-    let i = 0;
-    const syncOptions = {
-      from: 0,
-      onblock(current, final) {
-        i++;
-        assertEquals(final, networkBlockHeight);
-        assertEquals(typeof current, "number");
-      },
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    let synced = false;
+    let onBlockCalls = 0;
+
+    const from = 0;
+    const onblock = () => {
+      if (++onBlockCalls > 2) {
+        controller.abort();
+      }
     };
 
-    await wallet.sync(syncOptions);
-    assertEquals(i, 10);
+    await wallet
+      .sync({ from, onblock, signal })
+      .then(() => (synced = true))
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          synced = false;
+        } else {
+          throw e;
+        }
+      });
 
+    assertEquals(onBlockCalls, 3);
+    assert(!synced);
+  }),
+});
+
+const controller = new AbortController();
+Deno.test({
+  name: "test abort during sync's fetch",
+  fn: withMockedFetch(
+    async () => {
+      // Clear the wallet before calling sync
+      await wallet.reset();
+
+      const { signal } = controller;
+      let synced = false;
+
+      await wallet
+        .sync({ from: 0, signal })
+        .then(() => (synced = true))
+        .catch((e) => {
+          if (e instanceof DOMException && e.name === "AbortError") {
+            synced = false;
+          } else {
+            throw e;
+          }
+        });
+
+      assert(!synced, "Should not have synced");
+    },
+    { controller },
+  ),
+});
+
+Deno.test({
+  name: "syncprogress more than chunkSize notes test",
+  fn: withMockedFetch(async () => {
+    // Clear the wallet before calling sync
     await wallet.reset();
+
+    const expectedIterations = 10;
+    let networkBlockHeight;
+    let blockHeights = [0];
+
+    await wallet.sync({
+      from: blockHeights[0],
+      onblock(current, final) {
+        // If `networkBlockHeight` is not set, then we are in the first iteration,
+        // and we can set `final` as the `networkBlockHeight`.
+        networkBlockHeight = networkBlockHeight ?? final;
+        blockHeights.push(current);
+
+        assertEquals(
+          final,
+          networkBlockHeight,
+          "Final block height should be same across iterations",
+        );
+      },
+    });
+
+    // The iteration are `10` but we started with `blockHeights` array with `0` as the first element
+    assertEquals(blockHeights.length, expectedIterations + 1);
+
+    const expectedBlockHeights = Array.from(
+      new Array(expectedIterations + 1),
+      (_, i) => {
+        const chunkSize = networkBlockHeight / expectedIterations;
+        return Math.floor(chunkSize * i);
+      },
+    );
+
+    assertEquals(blockHeights, expectedBlockHeights);
   }),
   sanitizeResources: false,
   sanitizeOps: false,
@@ -386,22 +468,20 @@ Deno.test({
   name: "syncprogress less than chunkSize notes test",
   fn: withMockedFetch(
     async () => {
-      const networkBlockHeight = await Wallet.networkBlockHeight;
+      // Clear the wallet before calling sync
+      await wallet.reset();
 
-      let i = 0;
-      const syncOptions = {
+      let onBlockCalls = 0;
+
+      await wallet.sync({
         from: 0,
-        onblock(current, final) {
-          i++;
-          assertEquals(final, networkBlockHeight);
-          assertEquals(typeof current, "number");
+        onblock() {
+          ++onBlockCalls;
         },
-      };
-
-      await wallet.sync(syncOptions);
+      });
 
       // check if only one iteration
-      assertEquals(i, 1);
+      assertEquals(onBlockCalls, 1);
     },
     { maxItems: 33 },
   ),

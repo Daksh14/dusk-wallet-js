@@ -31,7 +31,7 @@ function decompose(result) {
  * @param {String} function_name Function to call
  * @returns {Promise<Uint8Array>} a promise that resolves to the return value
  */
-export const call = (wasm, args, function_name) =>
+export const call = (wasm, args, function_name, signal) =>
   wasm.task(async (exports, { memcpy }) => {
     const { allocate, free_mem } = exports;
 
@@ -52,7 +52,7 @@ export const call = (wasm, args, function_name) =>
     await free_mem(result.ptr, result.length);
 
     return dest;
-  })();
+  })({ signal });
 
 /**
  * Perform a wasm function call with raw bytes
@@ -61,7 +61,7 @@ export const call = (wasm, args, function_name) =>
  * @param {WebAssembly.ExportValue} function_call name of the function you want to call
  * @returns {Uint8Array} bytes return value of the call
  */
-export const call_raw = (wasm, args, function_name) =>
+export const call_raw = (wasm, args, function_name, signal) =>
   wasm.task(async (exports, { memcpy }) => {
     const { allocate, free_mem } = exports;
     const function_call = exports[function_name];
@@ -79,4 +79,4 @@ export const call_raw = (wasm, args, function_name) =>
     const dest = await memcpy(null, result.ptr, result.length);
     await free_mem(result.ptr, result.length);
     return dest;
-  })();
+  })({ signal });

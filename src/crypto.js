@@ -28,8 +28,15 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
 /**
  * Callback type for getOwnedNotes function progress
  *
- * @callback syncProgress
- * @param {number} current - last note position synced
+ * @callback onprogress
+ * @param {number} progress - Progress percentage as floating number from 0 to 1 (0-100%)
+ */
+
+/**
+ * Progress Options for the `getOwnedNotes` function
+ * @typedef {Object} ProgressOptions
+ * @property {AbortSignal} [signal] The signal to abort the `getOwnedNotes` processing
+ * @property {onprogress} [onprogress] The callback for progress report
  */
 
 /**
@@ -38,10 +45,15 @@ export function getNullifiers(wasm, [...seed], [...notes]) {
  * @param {WebAssembly.Exports} - wasm
  * @param {Uint8Array} seed - Seed of the wallet
  * @param {Uint8Array} leaves - leafs we get from the node
- * @param {syncProgress} [onprogress] - callback for progress report
+ * @param {ProgressOptions} [options] - the progress options
  * @returns {Promise<object>} - noteData
  */
-export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
+export async function getOwnedNotes(
+  wasm,
+  seed,
+  leaves,
+  { onprogress, signal } = {},
+) {
   const totalBytes = leaves.length;
   const noteData = {
     notes: [],
@@ -73,9 +85,12 @@ export async function getOwnedNotes(wasm, seed, leaves, onprogress) {
       onprogress(bytesProcessed / totalBytes);
     }
 
-    const owned = await call_raw(wasm, args, "check_note_ownership").then(
-      parseEncodedJSON,
-    );
+    const owned = await call_raw(
+      wasm,
+      args,
+      "check_note_ownership",
+      signal,
+    ).then(parseEncodedJSON);
 
     noteData.notes = noteData.notes.concat(owned.notes);
     // We use number here because currently wallet-core doesn't know
