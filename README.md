@@ -1,7 +1,9 @@
 # dusk-wallet-js
-JavaScript library for rusk-wallet
+⛔ [DEPRECATED] dusk-wallet-js
 
-This will be later grafted into js-utils repo
+This repository has been archived and is no longer actively maintained.
+
+https://github.com/dusk-network/wallet-core
 
 # Guide to use
 
